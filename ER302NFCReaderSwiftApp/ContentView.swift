@@ -13,6 +13,10 @@ struct ContentView: View {
     @State private var data: String = ""
     @State private var selectedPort = "none"
     @State private var selectedTab = 0
+    @State private var hexString = ""
+    @State private var messageForDecode = ""
+    @State private var commandHexString = ""
+    @State private var paramHexString = ""
     @StateObject private var nfcManager: SerialManager = SerialManager()
 
     var manager = ORSSerialPortManager.shared()
@@ -53,47 +57,49 @@ struct ContentView: View {
                     .border(Color.gray.opacity(0.5), width: 1)
                 Picker("", selection: $selectedTab) {
                             Text("General").tag(0)
-                            Text("Advanced").tag(1)
-                            Text("Tools").tag(2)
+                            Text("Ultralight").tag(1)
+                            Text("Micropayment").tag(2)
                         }
                         .pickerStyle(.segmented) // Ettől lesz "fül" kinézete
                         .padding()
 
                         // 4. Az aktuális fül tartalma (TabView helyett egy Switch vagy If)
                         ZStack {
-                            if selectedTab == 0 {
-                                generalTabView
-                            } else if selectedTab == 1 {
-                                advancedTabView
-                            } else {
+                            switch selectedTab {
+                            case 0 : generalTabView
+                            case 1 : advancedTabView
+                            default:
                                 Text("Egyéb eszközök...")
+                                Button("Test conversation") {
+                                    // Ez a kód fut le kattintáskor
+                                    let bytes: [UInt8] = [0xAA, 0xBB, 0x0D, 0x00, 0xFF]
+                                    let data = Data(bytes)
+                                    let hexString = data.hexEncodedString()
+                                    
+                                    appendLog(hexString)
+                                    
+                                    let data2 = Data(hexToBytes(hexString)!)
+                                    
+                                    print(data2)
+                                }
+                                .buttonStyle(.borderedProminent) // Stílus hozzáadása
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color(NSColor.windowBackgroundColor))
             }
             .padding()
-            /*
-            Button("Test conversation") {
-                // Ez a kód fut le kattintáskor
-                let bytes: [UInt8] = [0xAA, 0xBB, 0x0D, 0x00, 0xFF]
-                let data = Data(bytes)
-                let hexString = data.hexEncodedString()
-                
-                print(hexString) // Eredmény: AABB0D00FF
-                
-                let data2 = Data(hexToBytes(hexString)!)
-                
-                print(data2)
-            }
-            .buttonStyle(.borderedProminent) // Stílus hozzáadása
-            */
         }
+        
     }
     
+    private func appendLog(_ text: String) {
+        nfcManager.receivedLogs += text + "\n"
+    }
+
     var generalTabView: some View {
         VStack(spacing: 20) {
-            Text("Általános parancsok").font(.headline)
+            Text("General commands").font(.headline)
             
             Button(action: {
                 let bytes = beep(msec: 100)
@@ -105,14 +111,42 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
             .disabled(!(nfcManager.serialPort?.isOpen ?? false))
             
-            Spacer()
+            Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text("Hex String")
+                    TextField("Hex String", text: $hexString)
+                    Button("Send") {
+                        nfcManager.sendCommand(hexToBytes(hexString) ?? [])
+                    }
+                }
+                GridRow {
+                    Text("Message")
+                    TextField("Message", text: $messageForDecode)
+                    Button("Decode") {
+                        let response = ER302Driver.decodeReceivedData(hexToBytes(messageForDecode) ?? [])
+                        appendLog(response.asJSONString())
+                    }
+                }
+                GridRow {
+                    Text("Command:")
+                    TextField("Command", text: $commandHexString)
+                    Text("Params:")
+                    TextField("Params", text: $paramHexString)
+
+                    Button("Encode") {
+                        let cmd = buildCommand(cmd: hexToBytes(commandHexString) ?? [], data: hexToBytes(paramHexString) ?? [])
+                        hexString = ER302Driver.byteArrayToHexString(cmd)
+                    }
+                }
+            }
+
         }
         .padding()
     }
     
     var advancedTabView: some View {
         VStack(spacing: 20) {
-            Text("Speciális parancsok").font(.headline)
+            Text("Ultralight commands").font(.headline)
         }
     }
     
@@ -157,6 +191,7 @@ extension Data {
         return map { String(format: "%02hhX", $0) }.joined()
     }
 }
+
 
 #Preview {
     ContentView()

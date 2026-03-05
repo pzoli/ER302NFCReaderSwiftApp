@@ -26,14 +26,14 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         serialPort?.delegate = self
         serialPort?.open()
         
-        appendLog("Kapcsolódás: \(path)")
+        appendLog("Connected to device at path: \(path)")
     }
 
     func sendCommand(_ command: [UInt8]) {
         if ((serialPort?.isOpen) != nil) {
             let data = Data(command)
             serialPort?.send(data)
-            appendLog("Küldve: \(data.hexEncodedString())")
+            appendLog("Sent data: \(data.hexEncodedString())")
         }
     }
 
@@ -44,28 +44,28 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     }
     
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
-        appendLog("Kapcsolódás bezárása.")
+        appendLog("Disconnected.")
     }
     // MARK: - ORSSerialPortDelegate
 
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
         // Itt jönnek be a bájtok az ER302-től (pl. AABB...)
         let hexString = data.map { String(format: "%02X", $0) }.joined()
-        appendLog("Fogadva: \(hexString)")
+        appendLog("Received data: \(hexString)")
     }
 
     func serialPortWasRemovedFromSystem(_ serialPort: ORSSerialPort) {
         self.serialPort = nil
-        appendLog("Az olvasót lecsatlakoztatták.")
+        appendLog("Reader removed.")
     }
     
     func serialPort(_ serialPort: ORSSerialPort, didEncounterError error: Error) {
-        appendLog("Hiba: \(error.localizedDescription)")
+        appendLog("Error: \(error.localizedDescription)")
     }
-    /*
+    
     deinit {
         serialPort?.close()
         serialPort?.delegate = nil
     }
-    */
+    
 }
