@@ -1,21 +1,160 @@
 //
 //  ContentView.swift
-//  ER302NFCReaderSwiftApp
+//  Homework4ER302
 //
-//  Created by Papp Zoltán on 2026. 03. 03..
+//  Created by Papp Zoltán on 2026. 02. 27..
 //
 
 import SwiftUI
+import ORSSerial
+internal import Combine
 
 struct ContentView: View {
+    @State private var data: String = ""
+    @State private var selectedPort = "none"
+    @State private var selectedTab = 0
+    @StateObject private var nfcManager: SerialManager = SerialManager()
+
+    var manager = ORSSerialPortManager.shared()
+    private var isConnected: Bool = false
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        VStack(spacing: 20) {
+            HStack {
+                Picker(selection: $selectedPort, label: Text("Serial Port")) {
+                    ForEach(self.manager.availablePorts, id: \.self.path) {
+                        Text($0.path)
+                    }
+                }.id(self.manager.availablePorts)
+            
+                let buttonLabel = (nfcManager.serialPort?.isOpen ?? false) ? "Disconnect" : "Connect"
+                Button(buttonLabel) {
+                    if nfcManager.serialPort?.isOpen ?? false {
+                            // Ha nyitva van, zárjuk be
+                            nfcManager.serialPort?.close()
+                            // Frissítsük a UI-t (az ORSSerialPort nem mindig küld azonnali értesítést a zárásról)
+                            nfcManager.objectWillChange.send()
+                        } else {
+                            // Ha zárva van, nyissuk meg
+                            if !selectedPort.isEmpty {
+                                nfcManager.setupPort(path: selectedPort)
+                            }
+                        }
+                }
+            }
+            VStack(alignment: .leading) {
+                Text("Log / Beérkező adatok:")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                
+                TextEditor(text: $nfcManager.receivedLogs)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(height: 250)
+                    .border(Color.gray.opacity(0.5), width: 1)
+                Picker("", selection: $selectedTab) {
+                            Text("General").tag(0)
+                            Text("Advanced").tag(1)
+                            Text("Tools").tag(2)
+                        }
+                        .pickerStyle(.segmented) // Ettől lesz "fül" kinézete
+                        .padding()
+
+                        // 4. Az aktuális fül tartalma (TabView helyett egy Switch vagy If)
+                        ZStack {
+                            if selectedTab == 0 {
+                                generalTabView
+                            } else if selectedTab == 1 {
+                                advancedTabView
+                            } else {
+                                Text("Egyéb eszközök...")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(NSColor.windowBackgroundColor))
+            }
+            .padding()
+            /*
+            Button("Test conversation") {
+                // Ez a kód fut le kattintáskor
+                let bytes: [UInt8] = [0xAA, 0xBB, 0x0D, 0x00, 0xFF]
+                let data = Data(bytes)
+                let hexString = data.hexEncodedString()
+                
+                print(hexString) // Eredmény: AABB0D00FF
+                
+                let data2 = Data(hexToBytes(hexString)!)
+                
+                print(data2)
+            }
+            .buttonStyle(.borderedProminent) // Stílus hozzáadása
+            */
+        }
+    }
+    
+    var generalTabView: some View {
+        VStack(spacing: 20) {
+            Text("Általános parancsok").font(.headline)
+            
+            Button(action: {
+                let bytes = beep(msec: 100)
+                nfcManager.sendCommand(bytes)
+            }) {
+                Label("Send Beep", systemImage: "speaker.wave.3")
+                    //.frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!(nfcManager.serialPort?.isOpen ?? false))
+            
+            Spacer()
         }
         .padding()
+    }
+    
+    var advancedTabView: some View {
+        VStack(spacing: 20) {
+            Text("Speciális parancsok").font(.headline)
+        }
+    }
+    
+    private func beep(msec: UInt8) -> [UInt8] {
+        let data: [UInt8] = [msec]
+        let result = buildCommand(cmd: ER302Driver.CMD_BEEP, data: data)
+        return result
+    }
+    
+    private func buildCommand(cmd: [UInt8], data: [UInt8]) -> [UInt8] {
+        var bodyRaw = Data()
+        bodyRaw.append(contentsOf: [0xFF, 0xFF]) // RESERVED
+        bodyRaw.append(contentsOf: cmd)
+        bodyRaw.append(contentsOf: data)
+        
+        let crcValue = ER302Driver.crc(Array(bodyRaw))
+        bodyRaw.append(crcValue)
+        
+        var msgRaw = Data()
+        msgRaw.append(contentsOf: [0xAA, 0xBB]) // HEADER
+        
+        let length = UInt16(2 + 1 + 2 + data.count)
+        
+        let lengthBytes = ER302Driver.shortToByteArray(length, bigEndian: false)
+        msgRaw.append(contentsOf: lengthBytes)
+        
+        msgRaw.append(bodyRaw)
+        
+        return Array(msgRaw)
+    }
+}
+
+func hexToBytes(_ hex: String) -> [UInt8]? {
+    let chars = Array(hex)
+    return stride(from: 0, to: chars.count, by: 2).compactMap {
+        UInt8(String(chars[$0..<$0+2]), radix: 16)
+    }
+}
+
+extension Data {
+    func hexEncodedString() -> String {
+        return map { String(format: "%02hhX", $0) }.joined()
     }
 }
 
