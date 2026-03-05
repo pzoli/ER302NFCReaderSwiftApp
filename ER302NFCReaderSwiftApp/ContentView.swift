@@ -69,18 +69,8 @@ struct ContentView: View {
                             case 0 : generalTabView
                             case 1 : advancedTabView
                             default:
-                                Text("Egyéb eszközök...")
+                                Text("Other tools...")
                                 Button("Test conversation") {
-                                    // Ez a kód fut le kattintáskor
-                                    let bytes: [UInt8] = [0xAA, 0xBB, 0x0D, 0x00, 0xFF]
-                                    let data = Data(bytes)
-                                    let hexString = data.hexEncodedString()
-                                    
-                                    appendLog(hexString)
-                                    
-                                    let data2 = Data(hexToBytes(hexString)!)
-                                    
-                                    print(data2)
                                 }
                                 .buttonStyle(.borderedProminent) // Stílus hozzáadása
                             }
