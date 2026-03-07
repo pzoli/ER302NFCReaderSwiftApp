@@ -17,11 +17,13 @@ struct ContentView: View {
     @State private var messageForDecode = ""
     @State private var commandHexString = ""
     @State private var paramHexString = ""
+    @State private var url = ""
+    @State private var urlDown = ""
     @StateObject private var nfcManager: SerialManager = SerialManager()
-
+    
     var manager = ORSSerialPortManager.shared()
     private var isConnected: Bool = false
-
+    
     var body: some View {
         VStack(spacing: 20) {
             HStack {
@@ -30,20 +32,20 @@ struct ContentView: View {
                         Text($0.path)
                     }
                 }.id(self.manager.availablePorts)
-            
+                
                 let buttonLabel = (nfcManager.serialPort?.isOpen ?? false) ? "Disconnect" : "Connect"
                 Button(buttonLabel) {
                     if nfcManager.serialPort?.isOpen ?? false {
-                            // Ha nyitva van, zárjuk be
-                            nfcManager.serialPort?.close()
-                            // Frissítsük a UI-t (az ORSSerialPort nem mindig küld azonnali értesítést a zárásról)
-                            nfcManager.objectWillChange.send()
-                        } else {
-                            // Ha zárva van, nyissuk meg
-                            if !selectedPort.isEmpty {
-                                nfcManager.setupPort(path: selectedPort)
-                            }
+                        // Ha nyitva van, zárjuk be
+                        nfcManager.serialPort?.close()
+                        // Frissítsük a UI-t (az ORSSerialPort nem mindig küld azonnali értesítést a zárásról)
+                        nfcManager.objectWillChange.send()
+                    } else {
+                        // Ha zárva van, nyissuk meg
+                        if !selectedPort.isEmpty {
+                            nfcManager.setupPort(path: selectedPort)
                         }
+                    }
                 }
             }
             VStack(alignment: .leading) {
@@ -56,27 +58,27 @@ struct ContentView: View {
                     .frame(height: 250)
                     .border(Color.gray.opacity(0.5), width: 1)
                 Picker("", selection: $selectedTab) {
-                            Text("General").tag(0)
-                            Text("Ultralight").tag(1)
-                            Text("Micropayment").tag(2)
+                    Text("General").tag(0)
+                    Text("Ultralight").tag(1)
+                    Text("Micropayment").tag(2)
+                }
+                .pickerStyle(.segmented) // Ettől lesz "fül" kinézete
+                .padding()
+                
+                // 4. Az aktuális fül tartalma (TabView helyett egy Switch vagy If)
+                ZStack {
+                    switch selectedTab {
+                    case 0 : generalTabView
+                    case 1 : advancedTabView
+                    default:
+                        Text("Other tools...")
+                        Button("Test conversation") {
                         }
-                        .pickerStyle(.segmented) // Ettől lesz "fül" kinézete
-                        .padding()
-
-                        // 4. Az aktuális fül tartalma (TabView helyett egy Switch vagy If)
-                        ZStack {
-                            switch selectedTab {
-                            case 0 : generalTabView
-                            case 1 : advancedTabView
-                            default:
-                                Text("Other tools...")
-                                Button("Test conversation") {
-                                }
-                                .buttonStyle(.borderedProminent) // Stílus hozzáadása
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(NSColor.windowBackgroundColor))
+                        .buttonStyle(.borderedProminent) // Stílus hozzáadása
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.windowBackgroundColor))
             }
             .padding()
         }
@@ -86,17 +88,18 @@ struct ContentView: View {
     private func appendLog(_ text: String) {
         nfcManager.receivedLogs += text + "\n"
     }
-
+    
     var generalTabView: some View {
         VStack(spacing: 20) {
             Text("General commands").font(.headline)
             
             Button(action: {
-                let bytes = beep(msec: 100)
+                let bytes = Commands.beep(msec: 100)
+                nfcManager.clearLog()
                 nfcManager.sendCommand(bytes)
             }) {
                 Label("Send Beep", systemImage: "speaker.wave.3")
-                    //.frame(maxWidth: .infinity)
+                //.frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .disabled(!(nfcManager.serialPort?.isOpen ?? false))
@@ -106,6 +109,7 @@ struct ContentView: View {
                     Text("Hex String")
                     TextField("Hex String", text: $hexString)
                     Button("Send") {
+                        nfcManager.clearLog()
                         nfcManager.sendCommand(hexToBytes(hexString) ?? [])
                     }
                 }
@@ -122,14 +126,14 @@ struct ContentView: View {
                     TextField("Command", text: $commandHexString)
                     Text("Params:")
                     TextField("Params", text: $paramHexString)
-
+                    
                     Button("Encode") {
-                        let cmd = buildCommand(cmd: hexToBytes(commandHexString) ?? [], data: hexToBytes(paramHexString) ?? [])
+                        let cmd = Commands.buildCommand(cmd: hexToBytes(commandHexString) ?? [], data: hexToBytes(paramHexString) ?? [])
                         hexString = ER302Driver.byteArrayToHexString(cmd)
                     }
                 }
             }
-
+            
         }
         .padding()
     }
@@ -137,35 +141,70 @@ struct ContentView: View {
     var advancedTabView: some View {
         VStack(spacing: 20) {
             Text("Ultralight commands").font(.headline)
+            Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text("URL on Ultralight:")
+                    TextField("URL", text: $url)
+                    Button("Upload") {
+                        uploadURL()
+                    }
+                    Button("Download") {
+                        downloadURL()
+                    }
+                }
+            }
         }
     }
     
-    private func beep(msec: UInt8) -> [UInt8] {
-        let data: [UInt8] = [msec]
-        let result = buildCommand(cmd: ER302Driver.CMD_BEEP, data: data)
-        return result
+    func downloadURL() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.URL_MESSAGE
+        nfcManager.rawData = Data()
+        nfcManager.ulReadPageIdx = 4
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "Firmware version", cmd: Commands.readFirmware()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare anticolision", cmd: Commands.mifareAnticolision()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight select", cmd: Commands.mifareULSelect()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight select", cmd: Commands.mifareULRead(page: nfcManager.ulReadPageIdx)));
+        nfcManager.sendCommand(Commands.beep(msec: 50))
     }
     
-    private func buildCommand(cmd: [UInt8], data: [UInt8]) -> [UInt8] {
-        var bodyRaw = Data()
-        bodyRaw.append(contentsOf: [0xFF, 0xFF]) // RESERVED
-        bodyRaw.append(contentsOf: cmd)
-        bodyRaw.append(contentsOf: data)
-        
-        let crcValue = ER302Driver.crc(Array(bodyRaw))
-        bodyRaw.append(crcValue)
-        
-        var msgRaw = Data()
-        msgRaw.append(contentsOf: [0xAA, 0xBB]) // HEADER
-        
-        let length = UInt16(2 + 1 + 2 + data.count)
-        
-        let lengthBytes = ER302Driver.shortToByteArray(length, bigEndian: false)
-        msgRaw.append(contentsOf: lengthBytes)
-        
-        msgRaw.append(bodyRaw)
-        
-        return Array(msgRaw)
+    func uploadURL() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+        Thread.sleep(forTimeInterval: 1)
+        sendCommonULCommands()
+        let dataToWrite = ER302Driver.createNdefUrlMessage(url: url)
+        for i in stride(from: 0, to: dataToWrite!.count, by: 4) {
+            // Kiszámoljuk a hátralévő bájtokat a chunk méretéhez
+            let remaining = dataToWrite!.count - i
+            let chunkSize = min(4, remaining)
+            
+            // Szeletelés (Array slice) és feltöltés 0-kkal, ha 4-nél rövidebb a maradék
+            var chunk = Array(dataToWrite![i..<i + chunkSize])
+            if chunk.count < 4 {
+                chunk.append(contentsOf: Array(repeating: 0, count: 4 - chunk.count))
+            }
+            
+            let page = UInt8(4 + (i / 4))
+            let pcmd = Commands.mifareULWrite(page: page, data: chunk)
+            
+            nfcManager.sendCommand(pcmd)
+            
+            // 100ms várakozás az írások között
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        nfcManager.sendCommand(Commands.cmdHltA())
+    }
+    
+    func sendCommonULCommands() {
+        nfcManager.sendCommand(Commands.mifareRequest())
+        Thread.sleep(forTimeInterval: 1)
+        nfcManager.sendCommand(Commands.mifareAnticolision())
+        Thread.sleep(forTimeInterval: 1)
+        nfcManager.sendCommand(Commands.mifareULSelect())
+        Thread.sleep(forTimeInterval: 1)
     }
 }
 
