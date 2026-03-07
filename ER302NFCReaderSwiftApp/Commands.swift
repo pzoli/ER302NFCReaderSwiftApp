@@ -34,14 +34,14 @@ class Commands {
         return result
     }
 
+    // MARK: - MIFARE Commands
+
     public static func mifareRequest() -> [UInt8] {
         let data: [UInt8] = [0x52]
         let result = buildCommand(cmd: ER302Driver.CMD_MIFARE_REQUEST, data: data)
         return result
     }
     
-    // MARK: - MIFARE Commands
-
     public static func readBalance(sector: UInt8, block: UInt8) -> [UInt8] {
         let data: [UInt8] = [sector * 4 + block]
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_READ_BALANCE, data: data)
