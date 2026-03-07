@@ -265,27 +265,21 @@ class Commands {
 
     
     static func decodeNdefVCard(raw: Data) -> String {
-        // 1. Keressük meg a "text/vcard" típusjelzőt (ASCII kódolással)
-        let rawData = raw.dropFirst(3)
+        let rawData = raw.dropFirst(5)
         guard let rawString = String(data: rawData, encoding: .utf8) else {
             return "ERROR: UTF8 encoding not successfull."
         }
         
         let typeIndicator = "text/vcard"
         
-        // Megkeressük a szövegrészlet tartományát (Range)
         guard let range = rawString.range(of: typeIndicator) else {
             return "No VCard record found."
         }
         
-        // 2. Kiszámoljuk a kezdőpontot a tartomány vége alapján
         let vCardStartIndex = range.upperBound
         
-        // A maradék szövegrészt (suffix) UTF-8-ként kezeljük
-        // A Swiftben a String szeletelés hatékony, de ha bájtokkal akarsz dolgozni:
         let remainingString = String(rawString[vCardStartIndex...])
         
-        // Tisztítás: whitespace-ek és vezérlőkarakterek levágása
         let vCardContent = remainingString.trimmingCharacters(in: .whitespacesAndNewlines)
         
         return vCardContent

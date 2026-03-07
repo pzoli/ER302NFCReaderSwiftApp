@@ -230,7 +230,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         appendLog("readVCardProcessCommands called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_READ_FW_VERSION:
-            if let dataString = String(bytes: res.data, encoding: .ascii) {
+            if let dataString = String(bytes: res.data, encoding: .utf8) {
                 appendLog("Firmware version: \(dataString)")
             }
         case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
