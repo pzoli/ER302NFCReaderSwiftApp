@@ -133,6 +133,166 @@ class Commands {
         let data: [UInt8] = [page]
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_READ_BLOCK, data: data)
     }
+    
+    // MARK: - NDEF Creation
+    
+    static func createNdefUrlMessage(url: String) -> [UInt8]? {
+        let prefix: UInt8
+        let cleanUrl: String
+        
+        if url.hasPrefix("https://www.") {
+            cleanUrl = String(url.dropFirst(12))
+            prefix = 0x02
+        } else if url.hasPrefix("http://www.") {
+            cleanUrl = String(url.dropFirst(11))
+            prefix = 0x01
+        } else if url.hasPrefix("https://") {
+            cleanUrl = String(url.dropFirst(8))
+            prefix = 0x04
+        } else if url.hasPrefix("http://") {
+            cleanUrl = String(url.dropFirst(7))
+            prefix = 0x03
+        } else {
+            return nil // Vagy dobhatunk hibát is
+        }
+        
+        let urlBytes = Array(cleanUrl.utf8)
+        let payloadLen = urlBytes.count + 1
+        
+        // NDEF keretezés
+        var ndef = [UInt8]()
+        ndef.append(0xD1) // Record Header
+        ndef.append(0x01) // Type Length
+        ndef.append(UInt8(payloadLen))
+        ndef.append(0x55) // Record Type: "U"
+        ndef.append(prefix)
+        ndef.append(contentsOf: urlBytes)
+        
+        // TLV boríték
+        var tlv = [UInt8]()
+        tlv.append(0x03) // T: NDEF Message tag
+        tlv.append(UInt8(ndef.count)) // L: Length
+        tlv.append(contentsOf: ndef)
+        tlv.append(0xFE) // Terminator
+        
+        return tlv
+    }
+    
+    static func createNdefTextMessage(text: String) -> [UInt8] {
+        let langBytes = Array("en".utf8)
+        let textBytes = Array(text.utf8)
+        let payloadLen = 1 + langBytes.count + textBytes.count
+        
+        var ndef = [UInt8]()
+        ndef.append(0xD1)
+        ndef.append(0x01)
+        ndef.append(UInt8(payloadLen))
+        ndef.append(0x54) // Record Type: "T"
+        
+        ndef.append(UInt8(langBytes.count))
+        ndef.append(contentsOf: langBytes)
+        ndef.append(contentsOf: textBytes)
+        
+        var tlv = [UInt8]()
+        tlv.append(0x03)
+        tlv.append(UInt8(ndef.count))
+        tlv.append(contentsOf: ndef)
+        tlv.append(0xFE)
+        
+        return tlv
+    }
+    
+    static func createNdefVCardMessage(name: String, phone: String, email: String) -> [UInt8] {
+        let vcard = "BEGIN:VCARD\nVERSION:3.0\nFN:\(name)\nTEL:\(phone)\nEMAIL:\(email)\nEND:VCARD"
+        let vcardBytes = Array(vcard.utf8)
+        let typeBytes = Array("text/vcard".utf8)
+        
+        var ndef = [UInt8]()
+        ndef.append(0xD2)
+        ndef.append(UInt8(typeBytes.count))
+        ndef.append(UInt8(vcardBytes.count))
+        ndef.append(contentsOf: typeBytes)
+        ndef.append(contentsOf: vcardBytes)
+        
+        var tlv = [UInt8]()
+        tlv.append(0x03)
+        tlv.append(UInt8(ndef.count))
+        tlv.append(contentsOf: ndef)
+        tlv.append(0xFE)
+        
+        return tlv
+    }
+
+    // MARK: - NDEF Decoding
+    
+    static func decodeNdefUri(data: [UInt8]) -> String? {
+        guard data.count >= 7 else { return nil }
+        
+        let prefixCode = data[6]
+        let prefix: String
+        switch prefixCode {
+        case 0x01: prefix = "http://www."
+        case 0x02: prefix = "https://www."
+        case 0x03: prefix = "http://"
+        case 0x04: prefix = "https://"
+        default: prefix = ""
+        }
+        
+        let urlBytes = data[7...]
+        if let urlString = String(bytes: urlBytes, encoding: .utf8) {
+            return prefix + urlString
+        }
+        return nil
+    }
+    
+    static func decodeNdefText(raw: [UInt8]) -> String {
+        guard let typeIndex = raw.firstIndex(of: 0x54) else {
+            return "Nem Text Record."
+        }
+        
+        let payloadStartIndex = typeIndex + 1
+        guard payloadStartIndex < raw.count else { return "" }
+        
+        let statusByte = raw[payloadStartIndex]
+        let langCodeLength = Int(statusByte & 0x3F)
+        
+        let textStartIndex = payloadStartIndex + 1 + langCodeLength
+        guard textStartIndex < raw.count else { return "" }
+        
+        let textBytes = raw[textStartIndex...]
+        return String(bytes: textBytes, encoding: .utf8) ?? "Hiba a dekódolás során"
+    }
+
+    
+    static func decodeNdefVCard(raw: Data) -> String {
+        // 1. Keressük meg a "text/vcard" típusjelzőt (ASCII kódolással)
+        let rawData = raw.dropFirst(3)
+        guard let rawString = String(data: rawData, encoding: .utf8) else {
+            return "ERROR: UTF8 encoding not successfull."
+        }
+        
+        let typeIndicator = "text/vcard"
+        
+        // Megkeressük a szövegrészlet tartományát (Range)
+        guard let range = rawString.range(of: typeIndicator) else {
+            return "No VCard record found."
+        }
+        
+        // 2. Kiszámoljuk a kezdőpontot a tartomány vége alapján
+        let vCardStartIndex = range.upperBound
+        
+        // A maradék szövegrészt (suffix) UTF-8-ként kezeljük
+        // A Swiftben a String szeletelés hatékony, de ha bájtokkal akarsz dolgozni:
+        let remainingString = String(rawString[vCardStartIndex...])
+        
+        // Tisztítás: whitespace-ek és vezérlőkarakterek levágása
+        let vCardContent = remainingString.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        return vCardContent
+    }
+    
+    // MARK: - Build
+
     public static func buildCommand(cmd: [UInt8], data: [UInt8]) -> [UInt8] {
         var bodyRaw = Data()
         bodyRaw.append(contentsOf: [0xFF, 0xFF]) // RESERVED

@@ -162,7 +162,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                 // Swiftben a bájtok alapból UInt8 típusúak, így a & 0xFF elhagyható,
                 // de az olvashatóság kedvéért maradhat
                 if (b & 0xFF) == 0xFE {
-                    appendLog(ER302Driver.parseNdefUri(data: Array(rawData)) ?? "Unknown URL")
+                    appendLog(Commands.decodeNdefUri(data: Array(rawData)) ?? "Unknown URL")
                     foundURL = true
                     break
                 }
@@ -187,13 +187,84 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     }
 
     private func readTextProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
-        // TODO: Implement Text message processing
-        appendLog("readTextProcessCommands called with length: \(decodedResult.length)")
+        switch decodedResult {
+        case let res where res.cmd == ER302Driver.CMD_READ_FW_VERSION:
+            if let dataString = String(bytes: res.data, encoding: .utf8) {
+                appendLog("Firmware version: \(dataString)")
+            }
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
+            var foundURL = false
+            // Az Arrays.copyOfRange megfelelője a Swift szeletelés (slice)
+            let actualPageData = res.data.prefix(4)
+            let pageHexData = Data(actualPageData).hexEncodedString()
+            appendLog("Actual page (\(ulReadPageIdx)) bytes: \(pageHexData)")
+            for b in actualPageData {
+                // Swiftben a bájtok alapból UInt8 típusúak, így a & 0xFF elhagyható,
+                // de az olvashatóság kedvéért maradhat
+                if (b & 0xFF) == 0xFE {
+                    appendLog(Commands.decodeNdefText(raw: Array(rawData)))
+                    foundURL = true
+                    break
+                }
+                
+                // Feltételezve, hogy a rawData egy Data objektum vagy hasonló puffer
+                rawData.append(b)
+                ulReadIdx += 1
+            }
+
+            if !foundURL && ulReadPageIdx < 40 {
+                ulReadPageIdx += 1
+                let command = ER302Driver.CommandStruct(
+                    id: 5,
+                    description: "Mifare read Ultralight",
+                    cmd: Commands.mifareULRead(page: ulReadPageIdx)
+                )
+                addCommand(cmd: command)
+            }
+        default:
+            break
+        }
     }
 
     private func readVCardProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
-        // TODO: Implement vCard message processing
         appendLog("readVCardProcessCommands called with length: \(decodedResult.length)")
+        switch decodedResult {
+        case let res where res.cmd == ER302Driver.CMD_READ_FW_VERSION:
+            if let dataString = String(bytes: res.data, encoding: .ascii) {
+                appendLog("Firmware version: \(dataString)")
+            }
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
+            var foundVCard = false
+            // Az Arrays.copyOfRange megfelelője a Swift szeletelés (slice)
+            let actualPageData = res.data.prefix(4)
+            let pageHexData = Data(actualPageData).hexEncodedString()
+            appendLog("Actual page (\(ulReadPageIdx)) bytes: \(pageHexData)")
+            for b in actualPageData {
+                // Swiftben a bájtok alapból UInt8 típusúak, így a & 0xFF elhagyható,
+                // de az olvashatóság kedvéért maradhat
+                if (b & 0xFF) == 0xFE {
+                    appendLog(Commands.decodeNdefVCard(raw: rawData))
+                    foundVCard = true
+                    break
+                }
+                
+                // Feltételezve, hogy a rawData egy Data objektum vagy hasonló puffer
+                rawData.append(b)
+                ulReadIdx += 1
+            }
+
+            if !foundVCard && ulReadPageIdx < 40 {
+                ulReadPageIdx += 1
+                let command = ER302Driver.CommandStruct(
+                    id: ulReadIdx,
+                    description: "Mifare read Ultralight",
+                    cmd: Commands.mifareULRead(page: ulReadPageIdx)
+                )
+                addCommand(cmd: command)
+            }
+        default:
+            break
+        }
     }
 
     private func processBalanceCommads(_ decodedResult: ER302Driver.ReceivedStruct) {
@@ -212,3 +283,4 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     }
     
 }
+

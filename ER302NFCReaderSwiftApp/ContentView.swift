@@ -18,7 +18,11 @@ struct ContentView: View {
     @State private var commandHexString = ""
     @State private var paramHexString = ""
     @State private var url = ""
-    @State private var urlDown = ""
+    @State private var text = ""
+    @State private var vcardName = ""
+    @State private var vcardEmail = ""
+    @State private var vcardPhone = ""
+    
     @StateObject private var nfcManager: SerialManager = SerialManager()
     
     var manager = ORSSerialPortManager.shared()
@@ -152,6 +156,30 @@ struct ContentView: View {
                         downloadURL()
                     }
                 }
+                GridRow {
+                    Text("Text on Ultralight:")
+                    TextField("Text", text: $text)
+                    Button("Upload") {
+                        uploadText()
+                    }
+                    Button("Download") {
+                        downloadText()
+                    }
+                }
+                GridRow {
+                    Text("VCard name:")
+                    TextField("Name", text: $vcardName)
+                    Text("email:")
+                    TextField("email", text: $vcardEmail)
+                    Text("phone:")
+                    TextField("phone", text: $vcardPhone)
+                    Button("Upload") {
+                        uploadVCard()
+                    }
+                    Button("Download") {
+                        downloadVCard()
+                    }
+                }
             }
         }
     }
@@ -175,7 +203,7 @@ struct ContentView: View {
         nfcManager.sendCommand(Commands.beep(msec: 50))
         Thread.sleep(forTimeInterval: 1)
         sendCommonULCommands()
-        let dataToWrite = ER302Driver.createNdefUrlMessage(url: url)
+        let dataToWrite = Commands.createNdefUrlMessage(url: url)
         for i in stride(from: 0, to: dataToWrite!.count, by: 4) {
             // Kiszámoljuk a hátralévő bájtokat a chunk méretéhez
             let remaining = dataToWrite!.count - i
@@ -197,7 +225,91 @@ struct ContentView: View {
         }
         nfcManager.sendCommand(Commands.cmdHltA())
     }
+
+    func downloadText() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.TEXT_MESSAGE
+        nfcManager.rawData = Data()
+        nfcManager.ulReadPageIdx = 4
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "Firmware version", cmd: Commands.readFirmware()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare anticolision", cmd: Commands.mifareAnticolision()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight select", cmd: Commands.mifareULSelect()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight read page", cmd: Commands.mifareULRead(page: nfcManager.ulReadPageIdx)));
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
     
+    func uploadText() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+        Thread.sleep(forTimeInterval: 1)
+        sendCommonULCommands()
+        let dataToWrite = Commands.createNdefTextMessage(text: text)
+        for i in stride(from: 0, to: dataToWrite.count, by: 4) {
+            // Kiszámoljuk a hátralévő bájtokat a chunk méretéhez
+            let remaining = dataToWrite.count - i
+            let chunkSize = min(4, remaining)
+            
+            // Szeletelés (Array slice) és feltöltés 0-kkal, ha 4-nél rövidebb a maradék
+            var chunk = Array(dataToWrite[i..<i + chunkSize])
+            if chunk.count < 4 {
+                chunk.append(contentsOf: Array(repeating: 0, count: 4 - chunk.count))
+            }
+            
+            let page = UInt8(4 + (i / 4))
+            let pcmd = Commands.mifareULWrite(page: page, data: chunk)
+            
+            nfcManager.sendCommand(pcmd)
+            
+            // 100ms várakozás az írások között
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        nfcManager.sendCommand(Commands.cmdHltA())
+    }
+
+    func downloadVCard() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.VCARD_MESSAGE
+        nfcManager.rawData = Data()
+        nfcManager.ulReadPageIdx = 4
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "Firmware version", cmd: Commands.readFirmware()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare anticolision", cmd: Commands.mifareAnticolision()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight select", cmd: Commands.mifareULSelect()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight read page", cmd: Commands.mifareULRead(page: nfcManager.ulReadPageIdx)));
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+    
+    func uploadVCard() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+        Thread.sleep(forTimeInterval: 1)
+        sendCommonULCommands()
+        let dataToWrite = Commands.createNdefVCardMessage(name: vcardName, phone: vcardPhone, email: vcardEmail)
+        for i in stride(from: 0, to: dataToWrite.count, by: 4) {
+            // Kiszámoljuk a hátralévő bájtokat a chunk méretéhez
+            let remaining = dataToWrite.count - i
+            let chunkSize = min(4, remaining)
+            
+            // Szeletelés (Array slice) és feltöltés 0-kkal, ha 4-nél rövidebb a maradék
+            var chunk = Array(dataToWrite[i..<i + chunkSize])
+            if chunk.count < 4 {
+                chunk.append(contentsOf: Array(repeating: 0, count: 4 - chunk.count))
+            }
+            
+            let page = UInt8(4 + (i / 4))
+            let pcmd = Commands.mifareULWrite(page: page, data: chunk)
+            
+            nfcManager.sendCommand(pcmd)
+            
+            // 100ms várakozás az írások között
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        nfcManager.sendCommand(Commands.cmdHltA())
+    }
+
     func sendCommonULCommands() {
         nfcManager.sendCommand(Commands.mifareRequest())
         Thread.sleep(forTimeInterval: 1)
