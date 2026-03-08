@@ -26,8 +26,7 @@ struct ContentView: View {
     @StateObject private var nfcManager: SerialManager = SerialManager()
     
     var manager = ORSSerialPortManager.shared()
-    private var isConnected: Bool = false
-    
+
     var body: some View {
         VStack(spacing: 20) {
             HStack {
@@ -53,7 +52,7 @@ struct ContentView: View {
                 }
             }
             VStack(alignment: .leading) {
-                Text("Log / Beérkező adatok:")
+                Text("Log / received data:")
                     .font(.caption)
                     .foregroundColor(.gray)
                 
@@ -66,19 +65,16 @@ struct ContentView: View {
                     Text("Ultralight").tag(1)
                     Text("Micropayment").tag(2)
                 }
-                .pickerStyle(.segmented) // Ettől lesz "fül" kinézete
+                .pickerStyle(.segmented)
                 .padding()
                 
-                // 4. Az aktuális fül tartalma (TabView helyett egy Switch vagy If)
                 ZStack {
                     switch selectedTab {
                     case 0 : generalTabView
-                    case 1 : advancedTabView
+                    case 1 : ultralightTabView
+                    case 2 : paymentTabView
                     default:
                         Text("Other tools...")
-                        Button("Test conversation") {
-                        }
-                        .buttonStyle(.borderedProminent) // Stílus hozzáadása
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -91,6 +87,12 @@ struct ContentView: View {
     
     private func appendLog(_ text: String) {
         nfcManager.receivedLogs += text + "\n"
+    }
+    
+    var paymentTabView: some View {
+        VStack(spacing: 20) {
+            Text("Micropayment commands").font(.headline)
+        }
     }
     
     var generalTabView: some View {
@@ -142,7 +144,7 @@ struct ContentView: View {
         .padding()
     }
     
-    var advancedTabView: some View {
+    var ultralightTabView: some View {
         VStack(spacing: 20) {
             Text("Ultralight commands").font(.headline)
             Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
