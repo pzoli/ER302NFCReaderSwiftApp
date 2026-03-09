@@ -21,6 +21,15 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     public var ulReadIdx = 0
     public var rawData = Data()
     private var bout = Data()
+    private var currentUID = [UInt8]()
+    public var currentSector: UInt8 = 0
+    public var currentBlock: UInt8 = 0
+    public var currentKey = ""
+    public var isCurrentKeyA = false
+    public var balance: UInt32 = 0
+    public var modification: UInt32 = 0
+    
+    
     public var commandsProcessor: PROCESS = PROCESS.SINGLE_MESSAGE
 
     public enum PROCESS {
@@ -255,8 +264,79 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     }
 
     private func processBalanceCommads(_ decodedResult: ER302Driver.ReceivedStruct) {
-        // TODO: Implement balance-related processing
         appendLog("processBalanceCommads called with length: \(decodedResult.length)")
+        switch decodedResult {
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_REQUEST:
+            let command = ER302Driver.CommandStruct(
+                id: 4,
+                description: "Mifare Anticollision",
+                cmd: Commands.mifareAnticolision()
+            )
+            addCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
+            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            currentUID = res.data
+            let command = ER302Driver.CommandStruct(
+                id: 5,
+                description: "Mifare Select",
+                cmd: Commands.mifareSelect(select: currentUID)
+            )
+            addCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_SELECT:
+            let command = ER302Driver.CommandStruct(
+                id: 6,
+                description: "Mifare Auth2",
+                cmd: Commands.auth2(sector: currentSector, keyString: currentKey, keyA: isCurrentKeyA)
+            )
+            addCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_AUTH2:
+            switch commandsProcessor {
+            case PROCESS.GET_BALANCE_MESSAGE:
+                let command = ER302Driver.CommandStruct(
+                    id: 7,
+                    description: "Mifare get balance",
+                    cmd: Commands.readBalance(sector: currentSector, block: currentBlock)
+                )
+                addCommand(cmd: command)
+            case .SET_BALANCE_MESSAGE:
+                let command = ER302Driver.CommandStruct(
+                    id: 7,
+                    description: "Mifare set balance",
+                    cmd: Commands.initBalance(sector: currentSector, block: currentBlock, i: balance)
+                )
+                addCommand(cmd: command)
+            case .INC_BALANCE_MESSAGE:
+                let command = ER302Driver.CommandStruct(
+                    id: 7,
+                    description: "Mifare increment balance",
+                    cmd: Commands.incBalance(sector: currentSector, block: currentBlock, i: modification)
+                )
+                addCommand(cmd: command)
+            case .DEC_BALANCE_MESSAGE:
+                let command = ER302Driver.CommandStruct(
+                    id: 7,
+                    description: "Mifare decrement balance",
+                    cmd: Commands.decBalance(sector: currentSector, block: currentBlock, i: modification)
+                )
+                addCommand(cmd: command)
+            default:
+                break
+            }
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BALANCE:
+            if (res.error == 0x00) {
+                let readedBalance = ER302Driver.byteArrayToInteger(src: res.data, bigEndian: false)
+                appendLog("Mifare read balance: \(readedBalance)")
+            } else {
+                appendLog("Mifare ead balance error: \(res.error)")
+            }
+            
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_INCREMENT:
+            appendLog("Mifare balance modification: \(decodedResult.error)")
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_DECREMENT:
+            appendLog("Mifare balance modification: \(decodedResult.error)")
+        default:
+            break
+        }
     }
 
     private func processPasswordKeyChange(_ decodedResult: ER302Driver.ReceivedStruct) {

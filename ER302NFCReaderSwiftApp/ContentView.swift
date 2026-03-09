@@ -24,8 +24,10 @@ struct ContentView: View {
     @State private var vcardPhone = ""
     @State private var currentKey = "FFFFFFFFFFFF"
     @State private var currentKeyType = "KeyB"
-    @State private var balance = "1000"
-    @State private var modification = "500"
+    @State private var balance: UInt32 = 1000
+    @State private var currentBlock = "0"
+    @State private var currentSector: UInt8 = 5
+    @State private var modification: UInt32 = 500
     @State private var currentKeyForChange = "FFFFFFFFFFFF"
     @State private var newKeyForChange = "A1B2C3D4E5F6"
     @State private var keyTypeForChange = "KeyB"
@@ -167,23 +169,32 @@ struct ContentView: View {
                     }
                 }
                 GridRow {
+                    Text("Current sector")
+                    TextField("Current sector", value: $currentSector, format: .number)
+                    Picker("Current block", selection: $currentBlock) {
+                        ForEach(0..<3) { number in
+                            Text("\(number)").tag("\(number)")
+                        }
+                    }.pickerStyle(.menu)
+                }
+                GridRow {
                     Text("Balance")
-                    TextField("Balance", text: $balance)
+                    TextField("Balance", value: $balance, format: .number)
                     Button("Get") {
-                        
+                        getBalance()
                     }
                     Button("Set") {
-                        
+                        setBalance()
                     }
                 }
                 GridRow {
                     Text("Modification")
-                    TextField("Modification", text: $modification)
+                    TextField("Modification", value: $modification, format: .number)
                     Button("Increase") {
-                        
+                        incBalance()
                     }
                     Button("Decrease") {
-                        
+                        decBalance()
                     }
                 }
             }
@@ -416,6 +427,53 @@ struct ContentView: View {
         Thread.sleep(forTimeInterval: 1)
         nfcManager.sendCommand(Commands.mifareULSelect())
         Thread.sleep(forTimeInterval: 1)
+    }
+    
+    func getBalance() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.GET_BALANCE_MESSAGE
+        nfcManager.currentKey = currentKey
+        nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
+        nfcManager.currentBlock = UInt8(currentBlock)!
+        nfcManager.currentSector = currentSector
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+
+    func setBalance() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.SET_BALANCE_MESSAGE
+        nfcManager.currentKey = currentKey
+        nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
+        nfcManager.currentBlock = UInt8(currentBlock)!
+        nfcManager.currentSector = currentSector
+        nfcManager.balance = balance
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+
+    func incBalance() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.INC_BALANCE_MESSAGE
+        nfcManager.currentKey = currentKey
+        nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
+        nfcManager.currentBlock = UInt8(currentBlock)!
+        nfcManager.currentSector = currentSector
+        nfcManager.modification = modification
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+
+    func decBalance() {
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.DEC_BALANCE_MESSAGE
+        nfcManager.currentKey = currentKey
+        nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
+        nfcManager.currentBlock = UInt8(currentBlock)!
+        nfcManager.currentSector = currentSector
+        nfcManager.modification = modification
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.sendCommand(Commands.beep(msec: 50))
     }
 }
 

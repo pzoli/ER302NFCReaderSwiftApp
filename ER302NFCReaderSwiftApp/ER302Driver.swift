@@ -153,6 +153,19 @@ class ER302Driver {
         return bigEndian ? bytes : bytes.reversed()
     }
 
+    
+    static func byteArrayToInteger(src: [UInt8], bigEndian: Bool) -> Int32 {
+        let data = Data(src)
+        
+        let value = data.withUnsafeBytes { $0.load(as: Int32.self) }
+        
+        if bigEndian {
+            return Int32(bigEndian: value)
+        } else {
+            return Int32(littleEndian: value)
+        }
+    }
+
     // MARK: - Main Decoder
     
     static func decodeReceivedData(_ rc: [UInt8]) -> ReceivedStruct {
