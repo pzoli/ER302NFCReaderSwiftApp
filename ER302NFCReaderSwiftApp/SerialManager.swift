@@ -67,10 +67,10 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     func serialPortWasClosed(_ serialPort: ORSSerialPort) {
         appendLog("Disconnected.")
     }
+    
     // MARK: - ORSSerialPortDelegate
 
     func serialPort(_ serialPort: ORSSerialPort, didReceive data: Data) {
-        // Itt jönnek be a bájtok az ER302-től (pl. AABB...)
         let hexString = data.hexEncodedString()
         appendLog("Received data: \(hexString)")
         bout.append(data)
@@ -99,25 +99,23 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                 break
             }
             
-            // Puffer ürítése és frissítése
             if result.length < currentBuffer.count {
                 currentBuffer = currentBuffer.advanced(by: result.length)
             } else {
                 currentBuffer = Data()
             }
             
-            bout = Data() // bout.reset() megfelelője
+            bout = Data()
             
             if !currentBuffer.isEmpty {
                 bout.append(currentBuffer)
                 result = ER302Driver.decodeReceivedData(Array(currentBuffer))
             } else {
-                // Set result to an empty decoded result to end the loop
                 result = ER302Driver.decodeReceivedData([])
             }
             
             if !commands.isEmpty {
-                if let lastCommand = commands.dequeue() { // poll() megfelelője (függ a Queue implementációdtól)
+                if let lastCommand = commands.dequeue() {
                     appendLog("Send serial data [\(lastCommand.description)]: \(ER302Driver.byteArrayToHexString(lastCommand.cmd))")
                     sendCommand(lastCommand.cmd)
                 }
@@ -154,20 +152,16 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
             }
         case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
             var foundURL = false
-            // Az Arrays.copyOfRange megfelelője a Swift szeletelés (slice)
             let actualPageData = res.data.prefix(4)
             let pageHexData = Data(actualPageData).hexEncodedString()
             appendLog("Actual page (\(ulReadPageIdx)) bytes: \(pageHexData)")
             for b in actualPageData {
-                // Swiftben a bájtok alapból UInt8 típusúak, így a & 0xFF elhagyható,
-                // de az olvashatóság kedvéért maradhat
                 if (b & 0xFF) == 0xFE {
                     appendLog(Commands.decodeNdefUri(data: Array(rawData)) ?? "Unknown URL")
                     foundURL = true
                     break
                 }
                 
-                // Feltételezve, hogy a rawData egy Data objektum vagy hasonló puffer
                 rawData.append(b)
                 ulReadIdx += 1
             }
@@ -194,20 +188,16 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
             }
         case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
             var foundURL = false
-            // Az Arrays.copyOfRange megfelelője a Swift szeletelés (slice)
             let actualPageData = res.data.prefix(4)
             let pageHexData = Data(actualPageData).hexEncodedString()
             appendLog("Actual page (\(ulReadPageIdx)) bytes: \(pageHexData)")
             for b in actualPageData {
-                // Swiftben a bájtok alapból UInt8 típusúak, így a & 0xFF elhagyható,
-                // de az olvashatóság kedvéért maradhat
                 if (b & 0xFF) == 0xFE {
                     appendLog(Commands.decodeNdefText(raw: Array(rawData)))
                     foundURL = true
                     break
                 }
                 
-                // Feltételezve, hogy a rawData egy Data objektum vagy hasonló puffer
                 rawData.append(b)
                 ulReadIdx += 1
             }
@@ -235,13 +225,10 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
             }
         case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
             var foundVCard = false
-            // Az Arrays.copyOfRange megfelelője a Swift szeletelés (slice)
             let actualPageData = res.data.prefix(4)
             let pageHexData = Data(actualPageData).hexEncodedString()
             appendLog("Actual page (\(ulReadPageIdx)) bytes: \(pageHexData)")
             for b in actualPageData {
-                // Swiftben a bájtok alapból UInt8 típusúak, így a & 0xFF elhagyható,
-                // de az olvashatóság kedvéért maradhat
                 if (b & 0xFF) == 0xFE {
                     appendLog(Commands.decodeNdefVCard(raw: rawData))
                     foundVCard = true

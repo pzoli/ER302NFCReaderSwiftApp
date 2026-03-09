@@ -55,11 +55,30 @@ struct ContentView: View {
                 Text("Log / received data:")
                     .font(.caption)
                     .foregroundColor(.gray)
-                
-                TextEditor(text: $nfcManager.receivedLogs)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(height: 250)
-                    .border(Color.gray.opacity(0.5), width: 1)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(nfcManager.receivedLogs)
+                                    .font(.system(.body, design: .monospaced))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    // Ez teszi lehetővé a hosszú nyomásra előugró másolást:
+                                    .textSelection(.enabled)
+                                
+                                // Láthatatlan pont a görgetéshez
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id("BOTTOM_ANCHOR")
+                            }
+                            .padding()
+                        }
+                        .frame(height: 250)
+                        .border(Color.gray.opacity(0.5), width: 1)
+                        .onChange(of: nfcManager.receivedLogs) { _, _ in
+                            withAnimation {
+                                proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
+                            }
+                        }
+                }
                 Picker("", selection: $selectedTab) {
                     Text("General").tag(0)
                     Text("Ultralight").tag(1)
@@ -168,8 +187,10 @@ struct ContentView: View {
                         downloadText()
                     }
                 }
-                GridRow {
-                    Text("VCard name:")
+                Text("VCard on Ultralight:")
+                    .padding()
+                GridRow {                    
+                    Text("Name:")
                     TextField("Name", text: $vcardName)
                     Text("email:")
                     TextField("email", text: $vcardEmail)
@@ -339,3 +360,4 @@ extension Data {
 #Preview {
     ContentView()
 }
+
