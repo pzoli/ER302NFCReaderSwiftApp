@@ -22,7 +22,15 @@ struct ContentView: View {
     @State private var vcardName = ""
     @State private var vcardEmail = ""
     @State private var vcardPhone = ""
-    
+    @State private var currentKey = "FFFFFFFFFFFF"
+    @State private var currentKeyType = "KeyB"
+    @State private var balance = "1000"
+    @State private var modification = "500"
+    @State private var currentKeyForChange = "FFFFFFFFFFFF"
+    @State private var newKeyForChange = "A1B2C3D4E5F6"
+    @State private var keyTypeForChange = "KeyB"
+    @State private var newKeyTypeForChange = "KeyB"
+    @State private var keyAccessBitsForChange = "FF078069"
     @StateObject private var nfcManager: SerialManager = SerialManager()
     
     var manager = ORSSerialPortManager.shared()
@@ -83,6 +91,7 @@ struct ContentView: View {
                     Text("General").tag(0)
                     Text("Ultralight").tag(1)
                     Text("Micropayment").tag(2)
+                    Text("Key Management").tag(3)
                 }
                 .pickerStyle(.segmented)
                 .padding()
@@ -92,6 +101,7 @@ struct ContentView: View {
                     case 0 : generalTabView
                     case 1 : ultralightTabView
                     case 2 : paymentTabView
+                    case 3 : keymanagementTabView
                     default:
                         Text("Other tools...")
                     }
@@ -107,10 +117,76 @@ struct ContentView: View {
     private func appendLog(_ text: String) {
         nfcManager.receivedLogs += text + "\n"
     }
-    
+
+    var keymanagementTabView: some View {
+        VStack(spacing: 20) {
+            Text("Key management commands").font(.headline)
+            Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text("Current key")
+                    TextField("Current key", text: $currentKeyForChange)
+                    Picker(selection: $keyTypeForChange, label: Text("Key type")) {
+                        Text("KeyA").tag("KeyA")
+                        Text("KeyB").tag("KeyB")
+                    }
+                }
+                GridRow {
+                    Text("New key")
+                    TextField("New key", text: $newKeyForChange)
+                    Picker(selection: $newKeyTypeForChange, label: Text("Key type")) {
+                        Text("KeyA").tag("KeyA")
+                        Text("KeyB").tag("KeyB")
+                    }
+                }
+                GridRow {
+                    Text("Key Access bits")
+                    TextField("Key Access bits", text: $keyAccessBitsForChange)
+                    Button("Get") {
+                        
+                    }
+                }
+                GridRow {
+                    Button("Save") {
+                        
+                    }.padding()
+                }
+            }
+        }
+    }
+
     var paymentTabView: some View {
         VStack(spacing: 20) {
             Text("Micropayment commands").font(.headline)
+            Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    Text("Current key")
+                    TextField("Current key", text: $currentKey)
+                    Picker(selection: $currentKeyType, label: Text("Key type")) {
+                        Text("KeyA").tag("KeyA")
+                        Text("KeyB").tag("KeyB")
+                    }
+                }
+                GridRow {
+                    Text("Balance")
+                    TextField("Balance", text: $balance)
+                    Button("Get") {
+                        
+                    }
+                    Button("Set") {
+                        
+                    }
+                }
+                GridRow {
+                    Text("Modification")
+                    TextField("Modification", text: $modification)
+                    Button("Increase") {
+                        
+                    }
+                    Button("Decrease") {
+                        
+                    }
+                }
+            }
         }
     }
     

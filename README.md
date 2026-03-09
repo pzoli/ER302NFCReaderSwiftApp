@@ -3,3 +3,5 @@
 This is a MacOS Xcode Swift project for ER302 NFC reader/writer.
 
 ![Screenshot 1](docs/Screenshot1.png)
+![Screenshot 2](docs/Screenshot2.png)
+
