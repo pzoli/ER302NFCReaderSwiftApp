@@ -357,17 +357,16 @@ struct ContentView: View {
                 }
             }
             Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
-                Text("VCard data:")
                 GridRow {
                     Text("Actual Key:")
                     TextField("Key", text: $keyForClassic)
-                    Text("Key type:")
                     Picker(selection: $keyTypeForClassic, label: Text("Key type")) {
                         Text("KeyA").tag("KeyA")
                         Text("KeyB").tag("KeyB")
                     }
                 }
                 if let index = selectedPersonIndex {
+                    Text("VCard data:")
                     GridRow {
                         Text("Name:")
                         TextField("Name", text: $people[index].name)
