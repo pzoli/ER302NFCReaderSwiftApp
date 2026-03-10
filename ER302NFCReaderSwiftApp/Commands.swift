@@ -43,16 +43,18 @@ class Commands {
     }
     
     public static func readBalance(sector: UInt8, block: UInt8) -> [UInt8] {
-        let data: [UInt8] = [sector * 4 + block]
+        let data: [UInt8] = [absoluteBlock(sector:sector, blockInSector: block)]
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_READ_BALANCE, data: data)
     }
 
     public static func auth2(sector: UInt8, keyString: String, keyA: Bool) -> [UInt8] {
         let key = hexToBytes(keyString)
-        
+        let trailerBlock: UInt8 = {
+            if sector < 32 { return sector * 4 + 3 } else { return 32 * 4 + (sector - 32) * 16 + 15 }
+        }()
         var data = [UInt8]()
         data.append(keyA ? 0x60 : 0x61)
-        data.append(sector * 4)
+        data.append(trailerBlock)
         data.append(contentsOf: key!)
         
         let result = buildCommand(cmd: ER302Driver.CMD_MIFARE_AUTH2, data: data)
@@ -92,46 +94,50 @@ class Commands {
     }
 
     public static func incBalance(sector: UInt8, block: UInt8, i: UInt32) -> [UInt8] {
-        var data: [UInt8] = [sector * 4 + block]
+        var data: [UInt8] = [absoluteBlock(sector:sector, blockInSector: block)]
         let intInc = ER302Driver.intToByteArray(i, bigEndian: false)
         data.append(contentsOf: intInc)
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_INCREMENT, data: data)
     }
 
     public static func decBalance(sector: UInt8, block: UInt8, i: UInt32) -> [UInt8] {
-        var data: [UInt8] = [sector * 4 + block]
+        var data: [UInt8] = [absoluteBlock(sector:sector, blockInSector: block)]
         let intInc = ER302Driver.intToByteArray(i, bigEndian: false)
         data.append(contentsOf: intInc)
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_DECREMENT, data: data)
     }
 
     public static func initBalance(sector: UInt8, block: UInt8, i: UInt32) -> [UInt8] {
-        var data: [UInt8] = [sector * 4 + block]
+        var data: [UInt8] = [absoluteBlock(sector:sector, blockInSector: block)]
         let intInc = ER302Driver.intToByteArray(i, bigEndian: false)
         data.append(contentsOf: intInc)
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_INITVAL, data: data)
     }
 
-    public static func writeFourBytesToBlock(sector: UInt8, block: UInt8, dataBlock: [UInt8]) -> [UInt8] {
-        var data: [UInt8] = [sector * 4 + block]
-        data.append(contentsOf: dataBlock)
-        return buildCommand(cmd: ER302Driver.CMD_MIFARE_WRITE_BLOCK, data: data)
-    }
-
     public static func writeFullBlock(sector: UInt8, block: UInt8, dataBlock: [UInt8]) -> [UInt8] {
-        var data: [UInt8] = [sector * 4 + block]
+        var data: [UInt8] = [absoluteBlock(sector:sector, blockInSector: block)]
         data.append(contentsOf: dataBlock)
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_WRITE_BLOCK, data: data)
     }
 
     public static func readBlock(sector: UInt8, block: UInt8) -> [UInt8] {
-        let data: [UInt8] = [sector * 4 + block]
+        let data: [UInt8] = [absoluteBlock(sector:sector, blockInSector: block)]
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_READ_BLOCK, data: data)
     }
 
     public static func readULPage(page: UInt8) -> [UInt8] {
         let data: [UInt8] = [page]
         return buildCommand(cmd: ER302Driver.CMD_MIFARE_READ_BLOCK, data: data)
+    }
+    
+    static func absoluteBlock(sector: UInt8, blockInSector: UInt8) -> UInt8 {
+        if sector < 32 { // small sectors
+            return sector * 4 + blockInSector
+        } else { // big sectors (4K)
+            let base: UInt8 = 32 * 4 // first 32 sectors * 4 blocks
+            let bigIndex = sector - 32
+            return base + bigIndex * 16 + blockInSector
+        }
     }
     
     // MARK: - NDEF Creation
@@ -208,15 +214,40 @@ class Commands {
         let typeBytes = Array("text/vcard".utf8)
         
         var ndef = [UInt8]()
-        ndef.append(0xD2)
-        ndef.append(UInt8(typeBytes.count))
-        ndef.append(UInt8(vcardBytes.count))
-        ndef.append(contentsOf: typeBytes)
-        ndef.append(contentsOf: vcardBytes)
+        
+        let payloadLen = vcardBytes.count
+
+        if payloadLen <= 255 {
+            // Short Record: MB=1, ME=1, SR=1, TNF=0x02 (media-type)
+            ndef.append(0xD2 | 0x10) // 0xD2 is MB=1, ME=1, SR=0; add SR bit (0x10)
+            ndef.append(UInt8(typeBytes.count))     // Type Length (1 byte)
+            ndef.append(UInt8(payloadLen))          // Payload Length (1 byte)
+            ndef.append(contentsOf: typeBytes)      // Type
+            ndef.append(contentsOf: vcardBytes)     // Payload
+        } else {
+            // Normal Record: MB=1, ME=1, SR=0, TNF=0x02 (media-type)
+            ndef.append(0xD2)                       // SR bit is 0 here
+            ndef.append(UInt8(typeBytes.count))     // Type Length (1 byte)
+            // 4-byte Payload Length (big-endian)
+            let len32 = UInt32(payloadLen)
+            ndef.append(UInt8((len32 >> 24) & 0xFF))
+            ndef.append(UInt8((len32 >> 16) & 0xFF))
+            ndef.append(UInt8((len32 >> 8) & 0xFF))
+            ndef.append(UInt8(len32 & 0xFF))
+            ndef.append(contentsOf: typeBytes)      // Type
+            ndef.append(contentsOf: vcardBytes)     // Payload
+        }
         
         var tlv = [UInt8]()
         tlv.append(0x03)
-        tlv.append(UInt8(ndef.count))
+        if ndef.count < 0xFF {
+            tlv.append(UInt8(ndef.count))
+        } else {
+            tlv.append(0xFF)
+            let len = UInt16(ndef.count)
+            tlv.append(UInt8((len >> 8) & 0xFF))
+            tlv.append(UInt8(len & 0xFF))
+        }
         tlv.append(contentsOf: ndef)
         tlv.append(0xFE)
         

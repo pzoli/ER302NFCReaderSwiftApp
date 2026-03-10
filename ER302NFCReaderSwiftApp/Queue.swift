@@ -12,6 +12,10 @@ struct Queue<T> {
         elements.append(element)
     }
 
+    mutating func push(_ element: T) {
+        elements.insert(element, at: 0)
+    }
+
     mutating func dequeue() -> T? {
         return elements.isEmpty ? nil : elements.removeFirst()
     }

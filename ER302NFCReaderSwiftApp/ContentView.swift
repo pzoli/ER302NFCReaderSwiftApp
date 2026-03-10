@@ -22,6 +22,11 @@ struct ContentView: View {
     @State private var vcardName = ""
     @State private var vcardEmail = ""
     @State private var vcardPhone = ""
+    @State private var vcardForClassicName = "Papp Zoltán"
+    @State private var vcardForClassicEmail = "papp.zoltan@infokristaly.hu"
+    @State private var vcardForClassicPhone = "+36301234567"
+    @State private var keyForClassic = "FFFFFFFFFFFF"
+    @State private var keyTypeForClassic = "KeyB"
     @State private var currentKey = "FFFFFFFFFFFF"
     @State private var currentKeyType = "KeyB"
     @State private var balance: UInt32 = 1000
@@ -92,8 +97,9 @@ struct ContentView: View {
                 Picker("", selection: $selectedTab) {
                     Text("General").tag(0)
                     Text("Ultralight").tag(1)
-                    Text("Micropayment").tag(2)
-                    Text("Key Management").tag(3)
+                    Text("Classic").tag(2)
+                    Text("Micropayment").tag(3)
+                    Text("Key Management").tag(4)
                 }
                 .pickerStyle(.segmented)
                 .padding()
@@ -102,8 +108,9 @@ struct ContentView: View {
                     switch selectedTab {
                     case 0 : generalTabView
                     case 1 : ultralightTabView
-                    case 2 : paymentTabView
-                    case 3 : keymanagementTabView
+                    case 2 : classicTabView
+                    case 3 : paymentTabView
+                    case 4 : keymanagementTabView
                     default:
                         Text("Other tools...")
                     }
@@ -293,8 +300,42 @@ struct ContentView: View {
             }
         }
     }
-    
+
+    var classicTabView: some View {
+        VStack(spacing: 20) {
+            Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
+                Text("VCard data:")
+                GridRow {
+                    Text("Actual Key:")
+                    TextField("Key", text: $keyForClassic)
+                    Text("Key type:")
+                    Picker(selection: $keyTypeForClassic, label: Text("Key type")) {
+                        Text("KeyA").tag("KeyA")
+                        Text("KeyB").tag("KeyB")
+                    }
+                }
+                GridRow {
+                    Text("Name:")
+                    TextField("Name", text: $vcardForClassicName)
+                    Text("email:")
+                    TextField("email", text: $vcardForClassicEmail)
+                    Text("phone:")
+                    TextField("phone", text: $vcardForClassicPhone)
+                    Button("Upload to Classic") {
+                        uploadVCardClassic()
+                    }
+                    Button("Download") {
+                        downloadVCardClassic()
+                    }
+                }
+            }
+        }
+    }
+
     func downloadURL() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.URL_MESSAGE
         nfcManager.rawData = Data()
@@ -308,6 +349,9 @@ struct ContentView: View {
     }
     
     func uploadURL() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
         nfcManager.sendCommand(Commands.beep(msec: 50))
@@ -337,6 +381,9 @@ struct ContentView: View {
     }
 
     func downloadText() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.TEXT_MESSAGE
         nfcManager.rawData = Data()
@@ -350,6 +397,9 @@ struct ContentView: View {
     }
     
     func uploadText() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
         nfcManager.sendCommand(Commands.beep(msec: 50))
@@ -379,6 +429,9 @@ struct ContentView: View {
     }
 
     func downloadVCard() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.VCARD_MESSAGE
         nfcManager.rawData = Data()
@@ -387,11 +440,32 @@ struct ContentView: View {
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare anticolision", cmd: Commands.mifareAnticolision()));
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight select", cmd: Commands.mifareULSelect()));
-        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight read page", cmd: Commands.mifareULRead(page: nfcManager.ulReadPageIdx)));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare Ultralight read page", cmd: Commands.mifareULRead(page: nfcManager.ulReadPageIdx)))
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+    
+    func downloadVCardClassic() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.VCARD_CLASSIC_MESSAGE
+        nfcManager.rawData = Data()
+        nfcManager.currentSector = 1
+        nfcManager.currentBlock = 0
+        nfcManager.currentKey = keyForClassic
+        nfcManager.isCurrentKeyA = keyTypeForClassic == "KeyA"
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "Firmware version", cmd: Commands.readFirmware()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare anticolision", cmd: Commands.mifareAnticolision()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:4, description: "MiFare read block", cmd: Commands.readBlock(sector: nfcManager.currentSector, block: nfcManager.currentBlock)))
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
     
     func uploadVCard() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
         nfcManager.sendCommand(Commands.beep(msec: 50))
@@ -420,6 +494,82 @@ struct ContentView: View {
         nfcManager.sendCommand(Commands.cmdHltA())
     }
 
+    func uploadVCardClassic() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.WRITE_VCARD_CLASSIC_MESSAGE
+
+        // Build NDEF vCard payload using existing helper
+        let ndef = Commands.createNdefVCardMessage(name: vcardForClassicName, phone: vcardForClassicPhone, email: vcardForClassicEmail)
+
+        // Helper addCommand wrappers
+        func add(_ id: Int, _ description: String, _ cmd: [UInt8]) {
+            nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id: id, description: description, cmd: cmd))
+        }
+        func authenticate(sector: UInt8) {
+            let useKeyA = (keyTypeForClassic == "KeyA")
+            add(4, "Auth sector \(sector)", Commands.auth2(sector: sector, keyString: keyForClassic, keyA: useKeyA))
+        }
+
+        // Card activation
+        add(1, "MiFare Request", Commands.mifareRequest())
+        add(2, "MiFare Anticolision", Commands.mifareAnticolision())
+
+        // Prepare MAD (Sector 0 blocks 1 & 2) for NDEF AID per NFC Forum Type 2/Classic mapping
+        // MAD1 block (sector 0, block 1): set NDEF app (0x10) at position for sector 1 (bits for sector 1 -> 0x10)
+        authenticate(sector: 0)
+        let mad1: [UInt8] = hexToBytes("140103E103E103E103E103E103E103E1")! // includes version and directory entries
+        add(3, "Write MAD1 (S0 B1)", Commands.writeFullBlock(sector: 0, block: 1, dataBlock: mad1))
+
+        // MAD2 block (sector 0, block 2)
+        let mad2: [UInt8] = hexToBytes("03E103E103E103E103E103E103E103E1")!
+        add(3, "Write MAD2 (S0 B2)", Commands.writeFullBlock(sector: 0, block: 2, dataBlock: mad2))
+
+        // Sector 0 trailer: set MAD access and keep keys default (Key B left FF...)
+        authenticate(sector: 0)
+        let madTrailer: [UInt8] = [
+            0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7, // NFC Forum MAD Key A
+            0x78, 0x77, 0x88,                   // Access bits for MAD
+            0xC1,                               // GPB
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
+        ]
+        add(4, "Write MAD Trailer (S0 B3)", Commands.writeFullBlock(sector: 0, block: 3, dataBlock: madTrailer))
+
+        // Now write NDEF TLV starting at Sector 1, Block 0
+        var bytes = ndef
+        var sector: UInt8 = 1
+        var blockInSector: UInt8 = 0
+
+        authenticate(sector: sector)
+
+        while !bytes.isEmpty {
+            // Skip trailer block in any sector
+            let blocksPerSector: UInt8 = (sector < 32) ? 4 : 16
+            if blockInSector == blocksPerSector - 1 {
+                sector &+= 1
+                blockInSector = 0
+                authenticate(sector: sector)
+                continue
+            }
+
+            // Prepare 16-byte block
+            let count = min(16, bytes.count)
+            var block = Array(bytes.prefix(count))
+            if block.count < 16 { block.append(contentsOf: Array(repeating: 0x00, count: 16 - block.count)) }
+            bytes.removeFirst(count)
+
+            add(5, "Write S\(sector) B\(blockInSector)", Commands.writeFullBlock(sector: sector, block: blockInSector, dataBlock: block))
+
+            blockInSector &+= 1
+        }
+
+        // Halt and beep
+        add(6, "MiFare HltA", Commands.cmdHltA())
+        nfcManager.sendCommand(Commands.beep(msec: 80))
+    }
+
     func sendCommonULCommands() {
         nfcManager.sendCommand(Commands.mifareRequest())
         Thread.sleep(forTimeInterval: 1)
@@ -430,6 +580,9 @@ struct ContentView: View {
     }
     
     func getBalance() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.GET_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
@@ -441,6 +594,9 @@ struct ContentView: View {
     }
 
     func setBalance() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.SET_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
@@ -453,6 +609,9 @@ struct ContentView: View {
     }
 
     func incBalance() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.INC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
@@ -465,6 +624,9 @@ struct ContentView: View {
     }
 
     func decBalance() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.DEC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey

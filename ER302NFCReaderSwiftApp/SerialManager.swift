@@ -29,13 +29,12 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     public var balance: UInt32 = 0
     public var modification: UInt32 = 0
     
-    
     public var commandsProcessor: PROCESS = PROCESS.SINGLE_MESSAGE
 
     public enum PROCESS {
-        case SINGLE_MESSAGE, URL_MESSAGE, TEXT_MESSAGE, VCARD_MESSAGE,
+        case SINGLE_MESSAGE, URL_MESSAGE, TEXT_MESSAGE, VCARD_MESSAGE, VCARD_CLASSIC_MESSAGE,
         SET_BALANCE_MESSAGE, GET_BALANCE_MESSAGE, INC_BALANCE_MESSAGE, DEC_BALANCE_MESSAGE,
-        SETKEY_MESSAGE, GET_ACCESSBITS_MESSAGE
+        SETKEY_MESSAGE, GET_ACCESSBITS_MESSAGE, WRITE_VCARD_CLASSIC_MESSAGE
     };
     
     func setupPort(path: String) {
@@ -98,12 +97,16 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                 readTextProcessCommands(result)
             case .VCARD_MESSAGE:
                 readVCardProcessCommands(result)
+            case .VCARD_CLASSIC_MESSAGE:
+                readVCardClassicProcessCommands(result)
             case .SET_BALANCE_MESSAGE, .GET_BALANCE_MESSAGE, .INC_BALANCE_MESSAGE, .DEC_BALANCE_MESSAGE:
                 processBalanceCommads(result)
             case .SETKEY_MESSAGE:
                 processPasswordKeyChange(result)
             case .GET_ACCESSBITS_MESSAGE:
                 processGetAccessBits(result)
+            case .WRITE_VCARD_CLASSIC_MESSAGE:
+                processVCardWriteClassic(result)
             default:
                 break
             }
@@ -134,6 +137,9 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
 
     func addCommand(cmd: ER302Driver.CommandStruct) {
         commands.enqueue(cmd);
+    }
+    func pushCommand(cmd: ER302Driver.CommandStruct) {
+        commands.push(cmd);
     }
     
     func serialPortWasRemovedFromSystem(_ serialPort: ORSSerialPort) {
@@ -347,6 +353,77 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     private func processGetAccessBits(_ decodedResult: ER302Driver.ReceivedStruct) {
         // TODO: Implement get access bits processing
         appendLog("processGetAccessBits called with length: \(decodedResult.length)")
+    }
+    
+    private func readVCardClassicProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
+        func authenticate(_ sector: UInt8) {
+            let command = ER302Driver.CommandStruct(
+                id: 4,
+                description: "Mifare Auth",
+                cmd: Commands.auth2(sector: currentSector, keyString: currentKey, keyA: isCurrentKeyA)
+            )
+            pushCommand(cmd: command)
+        }
+        switch decodedResult {
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
+            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            currentUID = res.data
+            let command = ER302Driver.CommandStruct(
+                id: 3,
+                description: "Mifare Select",
+                cmd: Commands.mifareSelect(select: currentUID)
+            )
+            pushCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_SELECT:
+            authenticate(currentSector)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
+            var foundVCard = false
+            let actualPageData = res.data
+            let pageHexData = Data(actualPageData).hexEncodedString()
+            appendLog("Actual page (\(currentSector)/\(currentBlock)) bytes: \(pageHexData)")
+            for b in actualPageData {
+                if (b & 0xFF) == 0xFE {
+                    appendLog(Commands.decodeNdefVCard(raw: rawData))
+                    foundVCard = true
+                    break
+                }
+                rawData.append(b)
+            }
+
+            if res.error == 0 && !foundVCard && currentSector < 40 {
+                currentBlock += 1
+                if (currentBlock == 3) {
+                    currentBlock = 0
+                    currentSector += 1
+                    authenticate(currentSector)
+                }
+                let command = ER302Driver.CommandStruct(
+                    id: ulReadIdx,
+                    description: "Mifare read block",
+                    cmd: Commands.readBlock(sector: currentSector, block: currentBlock)
+                )
+                addCommand(cmd: command)
+            }
+        default :
+            break
+        }
+    }
+    
+    private func processVCardWriteClassic(_ decodedResult: ER302Driver.ReceivedStruct) {
+        appendLog("processVCardWriteClassic called with length: \(decodedResult.length)")
+        switch decodedResult {
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
+            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            currentUID = res.data
+            let command = ER302Driver.CommandStruct(
+                id: 3,
+                description: "Mifare Select",
+                cmd: Commands.mifareSelect(select: currentUID)
+            )
+            pushCommand(cmd: command)
+        default :
+            break
+        }
     }
     
 }
