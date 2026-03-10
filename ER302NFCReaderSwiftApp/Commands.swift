@@ -58,7 +58,6 @@ class Commands {
         data.append(contentsOf: key!)
         
         let result = buildCommand(cmd: ER302Driver.CMD_MIFARE_AUTH2, data: data)
-        print("auth command: \(ER302Driver.byteArrayToHexString(result))")
         return result
     }
 

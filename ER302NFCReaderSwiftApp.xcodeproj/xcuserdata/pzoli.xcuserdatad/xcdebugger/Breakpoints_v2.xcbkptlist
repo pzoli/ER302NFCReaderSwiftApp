@@ -190,8 +190,8 @@
             filePath = "ER302NFCReaderSwiftApp/Commands.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "228"
-            endingLineNumber = "228"
+            startingLineNumber = "227"
+            endingLineNumber = "227"
             landmarkName = "createNdefVCardMessage(name:phone:email:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -206,8 +206,8 @@
             filePath = "ER302NFCReaderSwiftApp/Commands.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "229"
-            endingLineNumber = "229"
+            startingLineNumber = "228"
+            endingLineNumber = "228"
             landmarkName = "createNdefVCardMessage(name:phone:email:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -242,36 +242,6 @@
             endingLineNumber = "448"
             landmarkName = "downloadVCardClassic()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "EA02C7DD-0AE9-4C32-9838-57FB3DEA11C6 - f342d6620ab328ff"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "ER302NFCReaderSwiftApp.ContentView.downloadVCard() -&gt; ()"
-                  moduleName = "ER302NFCReaderSwiftApp.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/pzoli/development/ER302NFCReaderSwiftApp/ER302NFCReaderSwiftApp/ContentView.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "448"
-                  endingLineNumber = "448">
-               </Location>
-               <Location
-                  uuid = "EA02C7DD-0AE9-4C32-9838-57FB3DEA11C6 - fb2e351005d38b30"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "ER302NFCReaderSwiftApp.ContentView.downloadVCardClassic() -&gt; ()"
-                  moduleName = "ER302NFCReaderSwiftApp.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/pzoli/development/ER302NFCReaderSwiftApp/ER302NFCReaderSwiftApp/ContentView.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "448"
-                  endingLineNumber = "448">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
