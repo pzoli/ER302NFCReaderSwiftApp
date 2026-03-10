@@ -8,6 +8,7 @@
 import SwiftUI
 import ORSSerial
 internal import Combine
+internal import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var data: String = ""
@@ -38,10 +39,21 @@ struct ContentView: View {
     @State private var keyTypeForChange = "KeyB"
     @State private var newKeyTypeForChange = "KeyB"
     @State private var keyAccessBitsForChange = "FF078069"
-    @StateObject private var nfcManager: SerialManager = SerialManager()
-    
-    var manager = ORSSerialPortManager.shared()
 
+    @State private var people: [Person] = []
+    @State private var selectedPersonID: Person.ID?
+    
+    @State private var isImporting: Bool = false
+    @State private var filename: String = "Nincs kiválasztott fájl"
+    
+    @StateObject private var nfcManager: SerialManager = SerialManager()
+
+    private var selectedPersonIndex: Int? {
+            people.firstIndex(where: { $0.id == selectedPersonID })
+        }
+
+    var manager = ORSSerialPortManager.shared()
+    
     var body: some View {
         VStack(spacing: 20) {
             HStack {
@@ -72,27 +84,27 @@ struct ContentView: View {
                     .foregroundColor(.gray)
                 ScrollViewReader { proxy in
                     ScrollView {
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(nfcManager.receivedLogs)
-                                    .font(.system(.body, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    // Ez teszi lehetővé a hosszú nyomásra előugró másolást:
-                                    .textSelection(.enabled)
-                                
-                                // Láthatatlan pont a görgetéshez
-                                Color.clear
-                                    .frame(height: 1)
-                                    .id("BOTTOM_ANCHOR")
-                            }
-                            .padding()
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(nfcManager.receivedLogs)
+                                .font(.system(.body, design: .monospaced))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            // Ez teszi lehetővé a hosszú nyomásra előugró másolást:
+                                .textSelection(.enabled)
+                            
+                            // Láthatatlan pont a görgetéshez
+                            Color.clear
+                                .frame(height: 1)
+                                .id("BOTTOM_ANCHOR")
                         }
-                        .frame(height: 250)
-                        .border(Color.gray.opacity(0.5), width: 1)
-                        .onChange(of: nfcManager.receivedLogs) { _, _ in
-                            withAnimation {
-                                proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
-                            }
+                        .padding()
+                    }
+                    .frame(height: 250)
+                    .border(Color.gray.opacity(0.5), width: 1)
+                    .onChange(of: nfcManager.receivedLogs) { _, _ in
+                        withAnimation {
+                            proxy.scrollTo("BOTTOM_ANCHOR", anchor: .bottom)
                         }
+                    }
                 }
                 Picker("", selection: $selectedTab) {
                     Text("General").tag(0)
@@ -119,14 +131,17 @@ struct ContentView: View {
                 .background(Color(NSColor.windowBackgroundColor))
             }
             .padding()
-        }
+        }.frame(minWidth: 800,
+                maxWidth: .infinity,
+                minHeight: 600,
+                maxHeight: .infinity)
         
     }
     
     private func appendLog(_ text: String) {
         nfcManager.receivedLogs += text + "\n"
     }
-
+    
     var keymanagementTabView: some View {
         VStack(spacing: 20) {
             Text("Key management commands").font(.headline)
@@ -162,7 +177,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     var paymentTabView: some View {
         VStack(spacing: 20) {
             Text("Micropayment commands").font(.headline)
@@ -283,7 +298,7 @@ struct ContentView: View {
                 }
                 Text("VCard on Ultralight:")
                     .padding()
-                GridRow {                    
+                GridRow {
                     Text("Name:")
                     TextField("Name", text: $vcardName)
                     Text("email:")
@@ -300,9 +315,47 @@ struct ContentView: View {
             }
         }
     }
-
+    
     var classicTabView: some View {
         VStack(spacing: 20) {
+            if people.isEmpty {
+                ContentUnavailableView("Nincs adat", systemImage: "doc.text.magnifyingglass", description: Text("Importálj egy CSV fájlt a kezdéshez."))
+            } else {
+                // SwiftUI Táblázat 3 oszloppal
+                Table(people, selection: $selectedPersonID) {
+                    TableColumn("Név", value: \.name)
+                    TableColumn("E-mail cím", value: \.email)
+                    TableColumn("Telefonszám", value: \.phone)
+                }
+            }
+            
+            Divider()
+            VStack(spacing: 20) {
+                Text(filename)
+                    .font(.headline)
+                
+                Button("Fájl kiválasztása") {
+                    isImporting = true
+                }
+            }
+            .padding()
+            // Itt történik a varázslat:
+            .fileImporter(
+                isPresented: $isImporting,
+                allowedContentTypes: [.commaSeparatedText], // Itt adhatod meg a típust (pl. .png, .pdf, .item)
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    if let selectedUrl = urls.first {
+                        self.filename = selectedUrl.lastPathComponent
+                        self.people = parseCSV(at: selectedUrl)
+                        print("Kiválasztott útvonal: \(selectedUrl.path(percentEncoded: false))")
+                    }
+                case .failure(let error):
+                    print("Hiba történt: \(error.localizedDescription)")
+                }
+            }
             Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
                 Text("VCard data:")
                 GridRow {
@@ -314,24 +367,26 @@ struct ContentView: View {
                         Text("KeyB").tag("KeyB")
                     }
                 }
-                GridRow {
-                    Text("Name:")
-                    TextField("Name", text: $vcardForClassicName)
-                    Text("email:")
-                    TextField("email", text: $vcardForClassicEmail)
-                    Text("phone:")
-                    TextField("phone", text: $vcardForClassicPhone)
-                    Button("Upload to Classic") {
-                        uploadVCardClassic()
-                    }
-                    Button("Download") {
-                        downloadVCardClassic()
+                if let index = selectedPersonIndex {
+                    GridRow {
+                        Text("Name:")
+                        TextField("Name", text: $people[index].name)
+                        Text("email:")
+                        TextField("email", text: $people[index].email)
+                        Text("phone:")
+                        TextField("phone", text: $people[index].phone)
+                        Button("Upload") {
+                            uploadVCardClassic()
+                        }
+                        Button("Download") {
+                            downloadVCardClassic()
+                        }
                     }
                 }
             }
         }
     }
-
+    
     func downloadURL() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
@@ -379,7 +434,7 @@ struct ContentView: View {
         }
         nfcManager.sendCommand(Commands.cmdHltA())
     }
-
+    
     func downloadText() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
@@ -427,7 +482,7 @@ struct ContentView: View {
         }
         nfcManager.sendCommand(Commands.cmdHltA())
     }
-
+    
     func downloadVCard() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
@@ -493,17 +548,18 @@ struct ContentView: View {
         }
         nfcManager.sendCommand(Commands.cmdHltA())
     }
-
+    
     func uploadVCardClassic() {
-        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+        if selectedPersonIndex == nil || nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
         }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.WRITE_VCARD_CLASSIC_MESSAGE
-
+        
         // Build NDEF vCard payload using existing helper
-        let ndef = Commands.createNdefVCardMessage(name: vcardForClassicName, phone: vcardForClassicPhone, email: vcardForClassicEmail)
-
+        let index = selectedPersonIndex!
+        let ndef = Commands.createNdefVCardMessage(name: people[index].name, phone: people[index].phone, email: people[index].email)
+        
         // Helper addCommand wrappers
         func add(_ id: Int, _ description: String, _ cmd: [UInt8]) {
             nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id: id, description: description, cmd: cmd))
@@ -512,21 +568,21 @@ struct ContentView: View {
             let useKeyA = (keyTypeForClassic == "KeyA")
             add(4, "Auth sector \(sector)", Commands.auth2(sector: sector, keyString: keyForClassic, keyA: useKeyA))
         }
-
+        
         // Card activation
         add(1, "MiFare Request", Commands.mifareRequest())
         add(2, "MiFare Anticolision", Commands.mifareAnticolision())
-
+        
         // Prepare MAD (Sector 0 blocks 1 & 2) for NDEF AID per NFC Forum Type 2/Classic mapping
         // MAD1 block (sector 0, block 1): set NDEF app (0x10) at position for sector 1 (bits for sector 1 -> 0x10)
         authenticate(sector: 0)
         let mad1: [UInt8] = hexToBytes("140103E103E103E103E103E103E103E1")! // includes version and directory entries
         add(3, "Write MAD1 (S0 B1)", Commands.writeFullBlock(sector: 0, block: 1, dataBlock: mad1))
-
+        
         // MAD2 block (sector 0, block 2)
         let mad2: [UInt8] = hexToBytes("03E103E103E103E103E103E103E103E1")!
         add(3, "Write MAD2 (S0 B2)", Commands.writeFullBlock(sector: 0, block: 2, dataBlock: mad2))
-
+        
         // Sector 0 trailer: set MAD access and keep keys default (Key B left FF...)
         authenticate(sector: 0)
         let madTrailer: [UInt8] = [
@@ -536,14 +592,14 @@ struct ContentView: View {
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
         ]
         add(4, "Write MAD Trailer (S0 B3)", Commands.writeFullBlock(sector: 0, block: 3, dataBlock: madTrailer))
-
+        
         // Now write NDEF TLV starting at Sector 1, Block 0
         var bytes = ndef
         var sector: UInt8 = 1
         var blockInSector: UInt8 = 0
-
+        
         authenticate(sector: sector)
-
+        
         while !bytes.isEmpty {
             // Skip trailer block in any sector
             let blocksPerSector: UInt8 = (sector < 32) ? 4 : 16
@@ -553,23 +609,23 @@ struct ContentView: View {
                 authenticate(sector: sector)
                 continue
             }
-
+            
             // Prepare 16-byte block
             let count = min(16, bytes.count)
             var block = Array(bytes.prefix(count))
             if block.count < 16 { block.append(contentsOf: Array(repeating: 0x00, count: 16 - block.count)) }
             bytes.removeFirst(count)
-
+            
             add(5, "Write S\(sector) B\(blockInSector)", Commands.writeFullBlock(sector: sector, block: blockInSector, dataBlock: block))
-
+            
             blockInSector &+= 1
         }
-
+        
         // Halt and beep
         add(6, "MiFare HltA", Commands.cmdHltA())
         nfcManager.sendCommand(Commands.beep(msec: 80))
     }
-
+    
     func sendCommonULCommands() {
         nfcManager.sendCommand(Commands.mifareRequest())
         Thread.sleep(forTimeInterval: 1)
@@ -592,7 +648,7 @@ struct ContentView: View {
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
-
+    
     func setBalance() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
@@ -607,7 +663,7 @@ struct ContentView: View {
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
-
+    
     func incBalance() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
@@ -622,7 +678,7 @@ struct ContentView: View {
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
-
+    
     func decBalance() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
@@ -636,6 +692,36 @@ struct ContentView: View {
         nfcManager.modification = modification
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
         nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+
+    func parseCSV(at url: URL) -> [Person] {
+        var people: [Person] = []
+        
+        // Sandbox engedély kérése
+        guard url.startAccessingSecurityScopedResource() else { return [] }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        do {
+            let content = try String(contentsOf: url, encoding: .utf8)
+            let rows = content.components(separatedBy: "\n").filter { !$0.isEmpty }
+            
+            // Az első sort (fejlécet) általában kihagyjuk: .dropFirst()
+            for row in rows.dropFirst() {
+                let columns = row.components(separatedBy: ",")
+                if columns.count >= 3 {
+                    let person = Person(
+                        name: columns[0].trimmingCharacters(in: .whitespaces),
+                        email: columns[1].trimmingCharacters(in: .whitespaces),
+                        phone: columns[2].trimmingCharacters(in: .whitespaces)
+                    )
+                    people.append(person)
+                }
+            }
+        } catch {
+            print("Hiba a fájl beolvasásakor: \(error)")
+        }
+        
+        return people
     }
 }
 
