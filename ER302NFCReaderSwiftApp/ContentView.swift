@@ -23,9 +23,6 @@ struct ContentView: View {
     @State private var vcardName = ""
     @State private var vcardEmail = ""
     @State private var vcardPhone = ""
-    @State private var vcardForClassicName = "Papp Zoltán"
-    @State private var vcardForClassicEmail = "papp.zoltan@infokristaly.hu"
-    @State private var vcardForClassicPhone = "+36301234567"
     @State private var keyForClassic = "FFFFFFFFFFFF"
     @State private var keyTypeForClassic = "KeyB"
     @State private var currentKey = "FFFFFFFFFFFF"
@@ -34,6 +31,7 @@ struct ContentView: View {
     @State private var currentBlock = "0"
     @State private var currentSector: UInt8 = 5
     @State private var modification: UInt32 = 500
+    @State private var currentSectorForChange: UInt8 = 5
     @State private var currentKeyForChange = "FFFFFFFFFFFF"
     @State private var newKeyForChange = "A1B2C3D4E5F6"
     @State private var keyTypeForChange = "KeyB"
@@ -44,7 +42,7 @@ struct ContentView: View {
     @State private var selectedPersonID: Person.ID?
     
     @State private var isImporting: Bool = false
-    @State private var filename: String = "Nincs kiválasztott fájl"
+    @State private var filename: String = "No file selected"
     
     @StateObject private var nfcManager: SerialManager = SerialManager()
 
@@ -147,6 +145,10 @@ struct ContentView: View {
             Text("Key management commands").font(.headline)
             Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
+                    Text("Current sector")
+                    TextField("Current sector", value: $currentSectorForChange, format: .number)
+                }
+                GridRow {
                     Text("Current key")
                     TextField("Current key", text: $currentKeyForChange)
                     Picker(selection: $keyTypeForChange, label: Text("Key type")) {
@@ -166,12 +168,12 @@ struct ContentView: View {
                     Text("Key Access bits")
                     TextField("Key Access bits", text: $keyAccessBitsForChange)
                     Button("Get") {
-                        
+                        getAccessBits()
                     }
                 }
                 GridRow {
                     Button("Save") {
-                        
+                        saveNewPassKey()
                     }.padding()
                 }
             }
@@ -319,13 +321,13 @@ struct ContentView: View {
     var classicTabView: some View {
         VStack(spacing: 20) {
             if people.isEmpty {
-                ContentUnavailableView("Nincs adat", systemImage: "doc.text.magnifyingglass", description: Text("Importálj egy CSV fájlt a kezdéshez."))
+                ContentUnavailableView("No data", systemImage: "doc.text.magnifyingglass", description: Text("Import a CSV file to see them here."))
             } else {
                 // SwiftUI Táblázat 3 oszloppal
                 Table(people, selection: $selectedPersonID) {
-                    TableColumn("Név", value: \.name)
-                    TableColumn("E-mail cím", value: \.email)
-                    TableColumn("Telefonszám", value: \.phone)
+                    TableColumn("Name", value: \.name)
+                    TableColumn("E-mail", value: \.email)
+                    TableColumn("Phone", value: \.phone)
                 }
             }
             
@@ -334,7 +336,7 @@ struct ContentView: View {
                 Text(filename)
                     .font(.headline)
                 
-                Button("Fájl kiválasztása") {
+                Button("Choose a CSV file") {
                     isImporting = true
                 }
             }
@@ -357,15 +359,15 @@ struct ContentView: View {
                 }
             }
             Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                    Text("Actual Key:")
-                    TextField("Key", text: $keyForClassic)
-                    Picker(selection: $keyTypeForClassic, label: Text("Key type")) {
-                        Text("KeyA").tag("KeyA")
-                        Text("KeyB").tag("KeyB")
-                    }
-                }
                 if let index = selectedPersonIndex {
+                    GridRow {
+                        Text("Actual Key:")
+                        TextField("Key", text: $keyForClassic)
+                        Picker(selection: $keyTypeForClassic, label: Text("Key type")) {
+                            Text("KeyA").tag("KeyA")
+                            Text("KeyB").tag("KeyB")
+                        }
+                    }
                     Text("VCard data:")
                     GridRow {
                         Text("Name:")
@@ -642,9 +644,9 @@ struct ContentView: View {
         nfcManager.commandsProcessor = SerialManager.PROCESS.GET_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
-        nfcManager.currentBlock = UInt8(currentBlock)!
         nfcManager.currentSector = currentSector
-        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.currentBlock = UInt8(currentBlock)!
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "MiFare request", cmd: Commands.mifareRequest()))
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
     
@@ -656,10 +658,10 @@ struct ContentView: View {
         nfcManager.commandsProcessor = SerialManager.PROCESS.SET_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
-        nfcManager.currentBlock = UInt8(currentBlock)!
         nfcManager.currentSector = currentSector
+        nfcManager.currentBlock = UInt8(currentBlock)!
         nfcManager.balance = balance
-        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "MiFare request", cmd: Commands.mifareRequest()))
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
     
@@ -671,10 +673,10 @@ struct ContentView: View {
         nfcManager.commandsProcessor = SerialManager.PROCESS.INC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
-        nfcManager.currentBlock = UInt8(currentBlock)!
         nfcManager.currentSector = currentSector
+        nfcManager.currentBlock = UInt8(currentBlock)!
         nfcManager.modification = modification
-        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "MiFare request", cmd: Commands.mifareRequest()))
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
     
@@ -686,10 +688,43 @@ struct ContentView: View {
         nfcManager.commandsProcessor = SerialManager.PROCESS.DEC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
-        nfcManager.currentBlock = UInt8(currentBlock)!
         nfcManager.currentSector = currentSector
+        nfcManager.currentBlock = UInt8(currentBlock)!
         nfcManager.modification = modification
-        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare request", cmd: Commands.mifareRequest()));
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "MiFare request", cmd: Commands.mifareRequest()))
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+
+    func saveNewPassKey() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.SETKEY_MESSAGE
+        nfcManager.currentKey = currentKeyForChange
+        nfcManager.newKey = newKeyForChange
+        nfcManager.accessBits = keyAccessBitsForChange
+        nfcManager.isCurrentKeyA = keyTypeForChange == "KeyA"
+        nfcManager.isNewKeyA = newKeyTypeForChange == "KeyA"
+        nfcManager.currentSector = currentSectorForChange
+        nfcManager.currentBlock = 3
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "MiFare request", cmd: Commands.mifareRequest()))
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare anticolision", cmd: Commands.mifareAnticolision()))
+        nfcManager.sendCommand(Commands.beep(msec: 50))
+    }
+    
+    func getAccessBits() {
+        if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
+        nfcManager.clearLog()
+        nfcManager.commandsProcessor = SerialManager.PROCESS.GET_ACCESSBITS_MESSAGE
+        nfcManager.currentKey = currentKeyForChange
+        nfcManager.isCurrentKeyA = keyTypeForChange == "KeyA"
+        nfcManager.currentSector = currentSectorForChange
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "MiFare request", cmd: Commands.mifareRequest()))
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:2, description: "MiFare anticolision", cmd: Commands.mifareAnticolision()))
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:3, description: "MiFare read block (\(currentSectorForChange) / 3)", cmd: Commands.readBlock(sector: currentSectorForChange, block: 3)))
         nfcManager.sendCommand(Commands.beep(msec: 50))
     }
 
@@ -723,20 +758,6 @@ struct ContentView: View {
         return people
     }
 }
-
-func hexToBytes(_ hex: String) -> [UInt8]? {
-    let chars = Array(hex)
-    return stride(from: 0, to: chars.count, by: 2).compactMap {
-        UInt8(String(chars[$0..<$0+2]), radix: 16)
-    }
-}
-
-extension Data {
-    func hexEncodedString() -> String {
-        return map { String(format: "%02hhX", $0) }.joined()
-    }
-}
-
 
 #Preview {
     ContentView()

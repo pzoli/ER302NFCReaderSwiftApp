@@ -25,10 +25,13 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     public var currentSector: UInt8 = 0
     public var currentBlock: UInt8 = 0
     public var currentKey = ""
+    public var newKey = ""
+    public var lastReadedBlock: [UInt8] = []
     public var isCurrentKeyA = false
+    public var isNewKeyA = false
     public var balance: UInt32 = 0
     public var modification: UInt32 = 0
-    
+    public var accessBits = ""
     public var commandsProcessor: PROCESS = PROCESS.SINGLE_MESSAGE
 
     public enum PROCESS {
@@ -346,24 +349,100 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     }
 
     private func processPasswordKeyChange(_ decodedResult: ER302Driver.ReceivedStruct) {
-        // TODO: Implement password/key change processing
         appendLog("processPasswordKeyChange called with length: \(decodedResult.length)")
+        switch decodedResult {
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
+            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            currentUID = res.data
+            let command = ER302Driver.CommandStruct(
+                id: 3,
+                description: "Mifare Select",
+                cmd: Commands.mifareSelect(select: currentUID)
+            )
+            pushCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_SELECT:
+            authenticate(currentSector)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_AUTH2:
+            let command = ER302Driver.CommandStruct(
+                id: 3,
+                description: "Mifare read block",
+                cmd: Commands.readBlock(sector: currentSector, block: 3)
+            )
+            addCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
+            if (res.error != 0) {
+                appendLog("Read error \(res.error)")
+                return
+            }
+            lastReadedBlock = res.data
+            let accessBitsBlock = hexToBytes(accessBits)
+            let newKeyBlock = hexToBytes(newKey)
+            for i in 0..<accessBitsBlock!.count {
+                lastReadedBlock[6 + i] = accessBitsBlock![i]
+            }
+            let offset: Int = isNewKeyA ? 0 : 10
+            for i in 0..<newKeyBlock!.count {
+                lastReadedBlock[offset + i] = newKeyBlock![i]
+            }
+            let command = ER302Driver.CommandStruct(
+                id: 4,
+                description: "Mifare Select",
+                cmd: Commands.writeFullBlock(sector: currentSector, block: 3, dataBlock: lastReadedBlock)
+            )
+            appendLog("Incoming block: \(Data(res.data).hexEncodedString()), new block: \(Data(lastReadedBlock).hexEncodedString())")
+            addCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_WRITE_BLOCK:
+            appendLog("Write block: \(res.error)")
+            addCommand(cmd: ER302Driver.CommandStruct(id: 6, description: "MiFare HltA", cmd: Commands.cmdHltA()))
+        default :
+            break
+        }
     }
 
     private func processGetAccessBits(_ decodedResult: ER302Driver.ReceivedStruct) {
-        // TODO: Implement get access bits processing
         appendLog("processGetAccessBits called with length: \(decodedResult.length)")
-    }
-    
-    private func readVCardClassicProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
-        func authenticate(_ sector: UInt8) {
+        switch decodedResult {
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
+            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            currentUID = res.data
             let command = ER302Driver.CommandStruct(
-                id: 4,
-                description: "Mifare Auth",
-                cmd: Commands.auth2(sector: currentSector, keyString: currentKey, keyA: isCurrentKeyA)
+                id: 3,
+                description: "Mifare Select",
+                cmd: Commands.mifareSelect(select: currentUID)
             )
             pushCommand(cmd: command)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_SELECT:
+            authenticate(currentSector)
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BLOCK:
+            if (res.error != 0) {
+                appendLog("Error reading block: \(res.error)")
+                return
+            }
+            let blockHexString = Data(res.data).hexEncodedString()
+            if (blockHexString.count < 20) {
+                appendLog("Access bits response lenght is smaller then 20: \(blockHexString)")
+                return
+            }
+            let accessBitsSclice = blockHexString[12..<20]
+            accessBits = String(accessBitsSclice)
+            addCommand(cmd: ER302Driver.CommandStruct(id: 6, description: "MiFare HltA", cmd: Commands.cmdHltA()))
+        case let res where res.cmd == ER302Driver.CMD_MIFARE_HLTA:
+            appendLog("Access bits: \(accessBits)")
+        default :
+            break
         }
+    }
+
+    func authenticate(_ sector: UInt8) {
+        let command = ER302Driver.CommandStruct(
+            id: 4,
+            description: "Mifare Auth",
+            cmd: Commands.auth2(sector: currentSector, keyString: currentKey, keyA: isCurrentKeyA)
+        )
+        pushCommand(cmd: command)
+    }
+
+    private func readVCardClassicProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
             appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
