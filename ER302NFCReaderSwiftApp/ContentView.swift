@@ -64,12 +64,9 @@ struct ContentView: View {
                 let buttonLabel = (nfcManager.serialPort?.isOpen ?? false) ? "Disconnect" : "Connect"
                 Button(buttonLabel) {
                     if nfcManager.serialPort?.isOpen ?? false {
-                        // Ha nyitva van, zárjuk be
                         nfcManager.serialPort?.close()
-                        // Frissítsük a UI-t (az ORSSerialPort nem mindig küld azonnali értesítést a zárásról)
                         nfcManager.objectWillChange.send()
                     } else {
-                        // Ha zárva van, nyissuk meg
                         if !selectedPort.isEmpty {
                             nfcManager.setupPort(path: selectedPort)
                         }
@@ -359,26 +356,45 @@ struct ContentView: View {
                 }
             }
             Grid(alignment: .center, horizontalSpacing: 10, verticalSpacing: 10) {
-                if let index = selectedPersonIndex {
-                    GridRow {
-                        Text("Actual Key:")
-                        TextField("Key", text: $keyForClassic)
-                        Picker(selection: $keyTypeForClassic, label: Text("Key type")) {
-                            Text("KeyA").tag("KeyA")
-                            Text("KeyB").tag("KeyB")
-                        }
+                GridRow {
+                    Text("Actual Key:")
+                    TextField("Key", text: $keyForClassic)
+                    Picker(selection: $keyTypeForClassic, label: Text("Key type")) {
+                        Text("KeyA").tag("KeyA")
+                        Text("KeyB").tag("KeyB")
                     }
-                    Text("VCard data:")
+                }
+                Text("VCard data:")
+                if let idx = selectedPersonIndex {
                     GridRow {
                         Text("Name:")
-                        TextField("Name", text: $people[index].name)
+                        TextField("Name", text: $people[idx].name)
                         Text("email:")
-                        TextField("email", text: $people[index].email)
+                        TextField("email", text: $people[idx].email)
                         Text("phone:")
-                        TextField("phone", text: $people[index].phone)
+                        TextField("phone", text: $people[idx].phone)
                         Button("Upload") {
                             uploadVCardClassic()
                         }
+                        Button("Download") {
+                            downloadVCardClassic()
+                        }
+                    }
+                } else {
+                    GridRow {
+                        Text("Name:")
+                        TextField("Name", text: .constant(""))
+                            .disabled(true)
+                        Text("email:")
+                        TextField("email", text: .constant(""))
+                            .disabled(true)
+                        Text("phone:")
+                        TextField("phone", text: .constant(""))
+                            .disabled(true)
+                        Button("Upload") {
+                            uploadVCardClassic()
+                        }
+                        .disabled(true)
                         Button("Download") {
                             downloadVCardClassic()
                         }
@@ -410,8 +426,6 @@ struct ContentView: View {
         }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
-        nfcManager.sendCommand(Commands.beep(msec: 50))
-        Thread.sleep(forTimeInterval: 1)
         sendCommonULCommands()
         let dataToWrite = Commands.createNdefUrlMessage(url: url)
         for i in stride(from: 0, to: dataToWrite!.count, by: 4) {
@@ -428,12 +442,10 @@ struct ContentView: View {
             let page = UInt8(4 + (i / 4))
             let pcmd = Commands.mifareULWrite(page: page, data: chunk)
             
-            nfcManager.sendCommand(pcmd)
-            
-            // 100ms várakozás az írások között
-            Thread.sleep(forTimeInterval: 0.5)
+            add(4,"MiFare UL Write page: \(page)",pcmd)
         }
-        nfcManager.sendCommand(Commands.cmdHltA())
+        add(5,"HltA",Commands.cmdHltA())
+        nfcManager.sendCommand(Commands.beep(msec: 50))
     }
     
     func downloadText() {
@@ -458,8 +470,6 @@ struct ContentView: View {
         }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
-        nfcManager.sendCommand(Commands.beep(msec: 50))
-        Thread.sleep(forTimeInterval: 1)
         sendCommonULCommands()
         let dataToWrite = Commands.createNdefTextMessage(text: text)
         for i in stride(from: 0, to: dataToWrite.count, by: 4) {
@@ -476,12 +486,10 @@ struct ContentView: View {
             let page = UInt8(4 + (i / 4))
             let pcmd = Commands.mifareULWrite(page: page, data: chunk)
             
-            nfcManager.sendCommand(pcmd)
-            
-            // 100ms várakozás az írások között
-            Thread.sleep(forTimeInterval: 0.5)
+            add(4,"MiFare write page: \(page)",pcmd)
         }
-        nfcManager.sendCommand(Commands.cmdHltA())
+        add(5, "HltA", Commands.cmdHltA())
+        nfcManager.sendCommand(Commands.beep(msec:50))
     }
     
     func downloadVCard() {
@@ -524,8 +532,7 @@ struct ContentView: View {
         }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
-        nfcManager.sendCommand(Commands.beep(msec: 50))
-        Thread.sleep(forTimeInterval: 1)
+        
         sendCommonULCommands()
         let dataToWrite = Commands.createNdefVCardMessage(name: vcardName, phone: vcardPhone, email: vcardEmail)
         for i in stride(from: 0, to: dataToWrite.count, by: 4) {
@@ -542,14 +549,16 @@ struct ContentView: View {
             let page = UInt8(4 + (i / 4))
             let pcmd = Commands.mifareULWrite(page: page, data: chunk)
             
-            nfcManager.sendCommand(pcmd)
-            
-            // 100ms várakozás az írások között
-            Thread.sleep(forTimeInterval: 0.5)
+            add(4,"UL Write page: \(page)",pcmd)
         }
-        nfcManager.sendCommand(Commands.cmdHltA())
+        add(5,"MiFare HltA",Commands.cmdHltA())
+        nfcManager.sendCommand(Commands.beep(msec: 50))
     }
     
+    func add(_ id: Int, _ description: String, _ cmd: [UInt8]) {
+        nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id: id, description: description, cmd: cmd))
+    }
+
     func uploadVCardClassic() {
         if selectedPersonIndex == nil || nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
@@ -561,10 +570,6 @@ struct ContentView: View {
         let index = selectedPersonIndex!
         let ndef = Commands.createNdefVCardMessage(name: people[index].name, phone: people[index].phone, email: people[index].email)
         
-        // Helper addCommand wrappers
-        func add(_ id: Int, _ description: String, _ cmd: [UInt8]) {
-            nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id: id, description: description, cmd: cmd))
-        }
         func authenticate(sector: UInt8) {
             let useKeyA = (keyTypeForClassic == "KeyA")
             add(4, "Auth sector \(sector)", Commands.auth2(sector: sector, keyString: keyForClassic, keyA: useKeyA))
@@ -628,12 +633,9 @@ struct ContentView: View {
     }
     
     func sendCommonULCommands() {
-        nfcManager.sendCommand(Commands.mifareRequest())
-        Thread.sleep(forTimeInterval: 1)
-        nfcManager.sendCommand(Commands.mifareAnticolision())
-        Thread.sleep(forTimeInterval: 1)
-        nfcManager.sendCommand(Commands.mifareULSelect())
-        Thread.sleep(forTimeInterval: 1)
+        add(1,"MiFare request",Commands.mifareRequest())
+        add(2,"MiFare anticolision",Commands.mifareAnticolision())
+        add(3,"MiFare UL select",Commands.mifareULSelect())
     }
     
     func getBalance() {
