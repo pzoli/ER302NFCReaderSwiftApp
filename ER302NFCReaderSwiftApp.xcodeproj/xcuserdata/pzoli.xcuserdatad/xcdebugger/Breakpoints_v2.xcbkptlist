@@ -238,8 +238,8 @@
             filePath = "ER302NFCReaderSwiftApp/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "512"
-            endingLineNumber = "512"
+            startingLineNumber = "527"
+            endingLineNumber = "527"
             landmarkName = "downloadVCardClassic()"
             landmarkType = "7">
          </BreakpointContent>
@@ -254,8 +254,8 @@
             filePath = "ER302NFCReaderSwiftApp/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "352"
-            endingLineNumber = "352"
+            startingLineNumber = "367"
+            endingLineNumber = "367"
             landmarkName = "classicTabView"
             landmarkType = "24">
          </BreakpointContent>
@@ -270,8 +270,8 @@
             filePath = "ER302NFCReaderSwiftApp/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "735"
-            endingLineNumber = "735"
+            startingLineNumber = "750"
+            endingLineNumber = "750"
             landmarkName = "parseCSV(at:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -286,8 +286,8 @@
             filePath = "ER302NFCReaderSwiftApp/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "737"
-            endingLineNumber = "737"
+            startingLineNumber = "752"
+            endingLineNumber = "752"
             landmarkName = "parseCSV(at:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -302,8 +302,8 @@
             filePath = "ER302NFCReaderSwiftApp/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "711"
-            endingLineNumber = "711"
+            startingLineNumber = "726"
+            endingLineNumber = "726"
             landmarkName = "saveNewPassKey()"
             landmarkType = "7">
          </BreakpointContent>
@@ -350,8 +350,8 @@
             filePath = "ER302NFCReaderSwiftApp/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "709"
-            endingLineNumber = "709"
+            startingLineNumber = "724"
+            endingLineNumber = "724"
             landmarkName = "saveNewPassKey()"
             landmarkType = "7">
          </BreakpointContent>
@@ -370,6 +370,22 @@
             endingLineNumber = "373"
             landmarkName = "processPasswordKeyChange(_:)"
             landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "25E3F4D1-F223-4E31-92CD-3ED79548074C"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ER302NFCReaderSwiftApp/ContentView.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "341"
+            endingLineNumber = "341"
+            landmarkName = "classicTabView"
+            landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

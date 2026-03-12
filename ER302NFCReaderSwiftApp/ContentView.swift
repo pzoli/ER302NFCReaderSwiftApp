@@ -43,6 +43,8 @@ struct ContentView: View {
     
     @State private var isImporting: Bool = false
     @State private var filename: String = "No file selected"
+ 
+    @FocusState private var isTextFieldFocused: Bool
     
     @StateObject private var nfcManager: SerialManager = SerialManager()
 
@@ -332,9 +334,22 @@ struct ContentView: View {
             VStack(spacing: 20) {
                 Text(filename)
                     .font(.headline)
-                
-                Button("Choose a CSV file") {
-                    isImporting = true
+                HStack {
+                    Button("Add person") {
+                        let item = Person(name: "", email: "", phone: "")
+                        people.append(item)
+                        selectedPersonID = item.id
+                        isTextFieldFocused = true
+                    }
+                    Button("Delete person") {
+                        if let id = selectedPersonID {
+                            people.removeAll { $0.id == id }
+                            selectedPersonID = nil
+                        }
+                    } .disabled(selectedPersonID == nil)
+                    Button("Choose a CSV file") {
+                        isImporting = true
+                    }
                 }
             }
             .padding()
@@ -368,7 +383,7 @@ struct ContentView: View {
                 if let idx = selectedPersonIndex {
                     GridRow {
                         Text("Name:")
-                        TextField("Name", text: $people[idx].name)
+                        TextField("Name", text: $people[idx].name).focused($isTextFieldFocused)
                         Text("email:")
                         TextField("email", text: $people[idx].email)
                         Text("phone:")
