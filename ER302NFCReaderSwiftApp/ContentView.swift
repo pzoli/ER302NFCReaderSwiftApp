@@ -44,6 +44,7 @@ struct ContentView: View {
     @State private var isImporting: Bool = false
     @State private var filename: String = "No file selected"
     @State private var showAlert = false
+    @State private var alertMessage = ""
     @FocusState private var isTextFieldFocused: Bool
     
     @StateObject private var nfcManager: SerialManager = SerialManager()
@@ -132,7 +133,12 @@ struct ContentView: View {
                 maxWidth: .infinity,
                 minHeight: 600,
                 maxHeight: .infinity)
-        
+        .alert("Error!", isPresented: $showAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
+
     }
     
     private func appendLog(_ text: String) {
@@ -247,21 +253,24 @@ struct ContentView: View {
                         nfcManager.clearLog()
                         let cmd = hexToBytes(hexString) ?? []
                         if (cmd.isEmpty) {
+                            alertMessage = "Error parsing hex string"
                             showAlert.toggle()
                             return
                         }
                         nfcManager.sendCommand(cmd)
-                    }.alert("Error!", isPresented: $showAlert) {
-                        Button("OK", role: .cancel) { }
-                    } message: {
-                        Text("Not a valid hexadecimal string!")
                     }
                 }
                 GridRow {
                     Text("Message")
                     TextField("Message", text: $messageForDecode)
                     Button("Decode") {
-                        let response = ER302Driver.decodeReceivedData(hexToBytes(messageForDecode) ?? [])
+                        let msg = hexToBytes(messageForDecode) ?? []
+                        if (msg.isEmpty) {
+                            alertMessage = "Error parsing hex message"
+                            showAlert.toggle()
+                            return
+                        }
+                        let response = ER302Driver.decodeReceivedData(msg)
                         appendLog(response.asJSONString())
                     }
                 }
