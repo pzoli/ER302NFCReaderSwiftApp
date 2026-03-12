@@ -43,7 +43,7 @@ struct ContentView: View {
     
     @State private var isImporting: Bool = false
     @State private var filename: String = "No file selected"
- 
+    @State private var showAlert = false
     @FocusState private var isTextFieldFocused: Bool
     
     @StateObject private var nfcManager: SerialManager = SerialManager()
@@ -245,7 +245,16 @@ struct ContentView: View {
                     TextField("Hex String", text: $hexString)
                     Button("Send") {
                         nfcManager.clearLog()
-                        nfcManager.sendCommand(hexToBytes(hexString) ?? [])
+                        let cmd = hexToBytes(hexString) ?? []
+                        if (cmd.isEmpty) {
+                            showAlert.toggle()
+                            return
+                        }
+                        nfcManager.sendCommand(cmd)
+                    }.alert("Error!", isPresented: $showAlert) {
+                        Button("OK", role: .cancel) { }
+                    } message: {
+                        Text("Not a valid hex string!")
                     }
                 }
                 GridRow {

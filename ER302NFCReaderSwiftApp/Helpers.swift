@@ -17,6 +17,7 @@ extension String {
 
 func hexToBytes(_ hex: String) -> [UInt8]? {
     let chars = Array(hex)
+    if chars.count.isMultiple(of: 2) == false { return nil }
     return stride(from: 0, to: chars.count, by: 2).compactMap {
         UInt8(String(chars[$0..<$0+2]), radix: 16)
     }

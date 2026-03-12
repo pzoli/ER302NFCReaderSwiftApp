@@ -188,7 +188,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                 ulReadPageIdx += 1
                 let command = ER302Driver.CommandStruct(
                     id: 5,
-                    description: "Mifare read Ultralight",
+                    description: "MiFare read Ultralight",
                     cmd: Commands.mifareULRead(page: ulReadPageIdx)
                 )
                 addCommand(cmd: command)
@@ -224,7 +224,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                 ulReadPageIdx += 1
                 let command = ER302Driver.CommandStruct(
                     id: 5,
-                    description: "Mifare read Ultralight",
+                    description: "MiFare read Ultralight",
                     cmd: Commands.mifareULRead(page: ulReadPageIdx)
                 )
                 addCommand(cmd: command)
@@ -262,7 +262,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                 ulReadPageIdx += 1
                 let command = ER302Driver.CommandStruct(
                     id: ulReadIdx,
-                    description: "Mifare read Ultralight",
+                    description: "MiFare read Ultralight",
                     cmd: Commands.mifareULRead(page: ulReadPageIdx)
                 )
                 addCommand(cmd: command)
@@ -278,23 +278,23 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_REQUEST:
             let command = ER302Driver.CommandStruct(
                 id: 4,
-                description: "Mifare Anticollision",
+                description: "MiFare Anticollision",
                 cmd: Commands.mifareAnticolision()
             )
             addCommand(cmd: command)
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
-            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            appendLog("MiFare anticollision received UID: " + Data(res.data).hexEncodedString())
             currentUID = res.data
             let command = ER302Driver.CommandStruct(
                 id: 5,
-                description: "Mifare Select",
+                description: "MiFare Select",
                 cmd: Commands.mifareSelect(select: currentUID)
             )
             addCommand(cmd: command)
         case let res where res.cmd == ER302Driver.CMD_MIFARE_SELECT:
             let command = ER302Driver.CommandStruct(
                 id: 6,
-                description: "Mifare Auth2",
+                description: "MiFare Auth2",
                 cmd: Commands.auth2(sector: currentSector, keyString: currentKey, keyA: isCurrentKeyA)
             )
             addCommand(cmd: command)
@@ -303,28 +303,28 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
             case PROCESS.GET_BALANCE_MESSAGE:
                 let command = ER302Driver.CommandStruct(
                     id: 7,
-                    description: "Mifare get balance",
+                    description: "MiFare get balance",
                     cmd: Commands.readBalance(sector: currentSector, block: currentBlock)
                 )
                 addCommand(cmd: command)
             case .SET_BALANCE_MESSAGE:
                 let command = ER302Driver.CommandStruct(
                     id: 7,
-                    description: "Mifare set balance",
+                    description: "MiFare set balance",
                     cmd: Commands.initBalance(sector: currentSector, block: currentBlock, i: balance)
                 )
                 addCommand(cmd: command)
             case .INC_BALANCE_MESSAGE:
                 let command = ER302Driver.CommandStruct(
                     id: 7,
-                    description: "Mifare increment balance",
+                    description: "MiFare increment balance",
                     cmd: Commands.incBalance(sector: currentSector, block: currentBlock, i: modification)
                 )
                 addCommand(cmd: command)
             case .DEC_BALANCE_MESSAGE:
                 let command = ER302Driver.CommandStruct(
                     id: 7,
-                    description: "Mifare decrement balance",
+                    description: "MiFare decrement balance",
                     cmd: Commands.decBalance(sector: currentSector, block: currentBlock, i: modification)
                 )
                 addCommand(cmd: command)
@@ -334,15 +334,15 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BALANCE:
             if (res.error == 0x00) {
                 let readedBalance = ER302Driver.byteArrayToInteger(src: res.data, bigEndian: false)
-                appendLog("Mifare read balance: \(readedBalance)")
+                appendLog("MiFare read balance: \(readedBalance)")
             } else {
-                appendLog("Mifare ead balance error: \(res.error)")
+                appendLog("MiFare read balance error: \(res.error)")
             }
             
         case let res where res.cmd == ER302Driver.CMD_MIFARE_INCREMENT:
-            appendLog("Mifare balance modification: \(decodedResult.error)")
+            appendLog("MiFare balance modification: \(decodedResult.error)")
         case let res where res.cmd == ER302Driver.CMD_MIFARE_DECREMENT:
-            appendLog("Mifare balance modification: \(decodedResult.error)")
+            appendLog("MiFare balance modification: \(decodedResult.error)")
         default:
             break
         }
@@ -352,11 +352,11 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         appendLog("processPasswordKeyChange called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
-            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            appendLog("MiFare anticollision received UID: " + Data(res.data).hexEncodedString())
             currentUID = res.data
             let command = ER302Driver.CommandStruct(
                 id: 3,
-                description: "Mifare Select",
+                description: "MiFare Select",
                 cmd: Commands.mifareSelect(select: currentUID)
             )
             pushCommand(cmd: command)
@@ -365,7 +365,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_AUTH2:
             let command = ER302Driver.CommandStruct(
                 id: 3,
-                description: "Mifare read block",
+                description: "MiFare read block",
                 cmd: Commands.readBlock(sector: currentSector, block: 3)
             )
             addCommand(cmd: command)
@@ -386,7 +386,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
             }
             let command = ER302Driver.CommandStruct(
                 id: 4,
-                description: "Mifare Select",
+                description: "MiFare Select",
                 cmd: Commands.writeFullBlock(sector: currentSector, block: 3, dataBlock: lastReadedBlock)
             )
             appendLog("Incoming block: \(Data(res.data).hexEncodedString()), new block: \(Data(lastReadedBlock).hexEncodedString())")
@@ -403,11 +403,11 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         appendLog("processGetAccessBits called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
-            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            appendLog("MiFare anticollision received UID: " + Data(res.data).hexEncodedString())
             currentUID = res.data
             let command = ER302Driver.CommandStruct(
                 id: 3,
-                description: "Mifare Select",
+                description: "MiFare Select",
                 cmd: Commands.mifareSelect(select: currentUID)
             )
             pushCommand(cmd: command)
@@ -436,7 +436,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     func authenticate(_ sector: UInt8) {
         let command = ER302Driver.CommandStruct(
             id: 4,
-            description: "Mifare Auth",
+            description: "MiFare Auth",
             cmd: Commands.auth2(sector: currentSector, keyString: currentKey, keyA: isCurrentKeyA)
         )
         pushCommand(cmd: command)
@@ -445,11 +445,11 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     private func readVCardClassicProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
-            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            appendLog("MiFare anticollision received UID: " + Data(res.data).hexEncodedString())
             currentUID = res.data
             let command = ER302Driver.CommandStruct(
                 id: 3,
-                description: "Mifare Select",
+                description: "MiFare Select",
                 cmd: Commands.mifareSelect(select: currentUID)
             )
             pushCommand(cmd: command)
@@ -478,7 +478,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                 }
                 let command = ER302Driver.CommandStruct(
                     id: ulReadIdx,
-                    description: "Mifare read block",
+                    description: "MiFare read block",
                     cmd: Commands.readBlock(sector: currentSector, block: currentBlock)
                 )
                 addCommand(cmd: command)
@@ -492,11 +492,11 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         appendLog("processVCardWriteClassic called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
-            appendLog("Mifare anticollision received UID: " + Data(res.data).hexEncodedString())
+            appendLog("MiFare anticollision received UID: " + Data(res.data).hexEncodedString())
             currentUID = res.data
             let command = ER302Driver.CommandStruct(
                 id: 3,
-                description: "Mifare Select",
+                description: "MiFare Select",
                 cmd: Commands.mifareSelect(select: currentUID)
             )
             pushCommand(cmd: command)
