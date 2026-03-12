@@ -254,7 +254,7 @@ struct ContentView: View {
                     }.alert("Error!", isPresented: $showAlert) {
                         Button("OK", role: .cancel) { }
                     } message: {
-                        Text("Not a valid hex string!")
+                        Text("Not a valid hexadecimal string!")
                     }
                 }
                 GridRow {
