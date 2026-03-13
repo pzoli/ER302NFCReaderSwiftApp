@@ -625,7 +625,7 @@ struct ContentView: View {
             showAlert.toggle()
             return
         }
-
+        
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.WRITE_VCARD_CLASSIC_MESSAGE
         
@@ -641,7 +641,7 @@ struct ContentView: View {
         // Card activation
         add(1, "MiFare Request", Commands.mifareRequest())
         add(2, "MiFare Anticolision", Commands.mifareAnticolision())
-        
+        //*
         // Prepare MAD (Sector 0 blocks 1 & 2) for NDEF AID per NFC Forum Type 2/Classic mapping
         // MAD1 block (sector 0, block 1): set NDEF app (0x10) at position for sector 1 (bits for sector 1 -> 0x10)
         authenticate(sector: 0)
@@ -655,13 +655,22 @@ struct ContentView: View {
         // Sector 0 trailer: set MAD access and keep keys default (Key B left FF...)
         authenticate(sector: 0)
         let madTrailer: [UInt8] = [
-            0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7, // NFC Forum MAD Key A
+            //0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7, // NFC Forum MAD Key A
+            0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5,
             0x78, 0x77, 0x88,                   // Access bits for MAD
             0xC1,                               // GPB
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
         ]
+
+        let madTrailerOthers: [UInt8] = [
+            0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7, // NFC Forum MAD Key A
+            0x7F, 0x07, 0x88,                   // Access bits for MAD
+            0x40,                               // GPB
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
+        ]
+
         add(4, "Write MAD Trailer (S0 B3)", Commands.writeFullBlock(sector: 0, block: 3, dataBlock: madTrailer))
-        
+        //*/
         // Now write NDEF TLV starting at Sector 1, Block 0
         var bytes = ndef
         var sector: UInt8 = 1
@@ -673,6 +682,7 @@ struct ContentView: View {
             // Skip trailer block in any sector
             let blocksPerSector: UInt8 = (sector < 32) ? 4 : 16
             if blockInSector == blocksPerSector - 1 {
+                add(4, "Write MAD Trailer (S\(sector) B3)", Commands.writeFullBlock(sector: sector, block: blockInSector, dataBlock: madTrailerOthers))
                 sector &+= 1
                 blockInSector = 0
                 authenticate(sector: sector)
@@ -686,7 +696,8 @@ struct ContentView: View {
             bytes.removeFirst(count)
             
             add(5, "Write S\(sector) B\(blockInSector)", Commands.writeFullBlock(sector: sector, block: blockInSector, dataBlock: block))
-            
+            add(4, "Write MAD Trailer (S\(sector) B3)", Commands.writeFullBlock(sector: sector, block: blocksPerSector-1, dataBlock: madTrailerOthers))
+
             blockInSector &+= 1
         }
         
