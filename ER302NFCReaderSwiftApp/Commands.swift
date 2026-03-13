@@ -225,12 +225,12 @@ class Commands {
             ndef.append(contentsOf: vcardBytes)     // Payload
         } else {
             // Normal Record: MB=1, ME=1, SR=0, TNF=0x02 (media-type)
-            ndef.append(0xD2)                       // SR bit is 0 here
+            ndef.append(0xC2)                       // SR bit is 0 here
             ndef.append(UInt8(typeBytes.count))     // Type Length (1 byte)
             // 4-byte Payload Length (big-endian)
-            let len32 = UInt16(payloadLen) //UInt32
-            //ndef.append(UInt8((len32 >> 24) & 0xFF))
-            //ndef.append(UInt8((len32 >> 16) & 0xFF))
+            let len32 = UInt16(payloadLen) //UInt16
+            ndef.append(UInt8((len32 >> 24) & 0xFF))
+            ndef.append(UInt8((len32 >> 16) & 0xFF))
             ndef.append(UInt8((len32 >> 8) & 0xFF))
             ndef.append(UInt8(len32 & 0xFF))
             ndef.append(contentsOf: typeBytes)      // Type
@@ -243,11 +243,9 @@ class Commands {
             tlv.append(UInt8(ndef.count))
         } else {
             tlv.append(0xFF)
-            let len32 = UInt16(ndef.count) //UInt32
-            //ndef.append(UInt8((len32 >> 24) & 0xFF))
-            //ndef.append(UInt8((len32 >> 16) & 0xFF))
-            tlv.append(UInt8((len32 >> 8) & 0xFF))
-            tlv.append(UInt8(len32 & 0xFF))
+            let len16 = UInt16(ndef.count) //UInt16
+            tlv.append(UInt8((len16 >> 8) & 0xFF))
+            tlv.append(UInt8(len16 & 0xFF))
         }
         tlv.append(contentsOf: ndef)
         tlv.append(0xFE)
