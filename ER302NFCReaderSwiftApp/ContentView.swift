@@ -266,7 +266,7 @@ struct ContentView: View {
                     Button("Decode") {
                         let msg = hexToBytes(messageForDecode) ?? []
                         if (msg.isEmpty) {
-                            alertMessage = "Error parsing hex message"
+                            alertMessage = "Error parsing message"
                             showAlert.toggle()
                             return
                         }
@@ -281,7 +281,19 @@ struct ContentView: View {
                     TextField("Params", text: $paramHexString)
                     
                     Button("Encode") {
-                        let cmd = Commands.buildCommand(cmd: hexToBytes(commandHexString) ?? [], data: hexToBytes(paramHexString) ?? [])
+                        let cmdHex = hexToBytes(commandHexString) ?? []
+                        if (cmdHex.isEmpty) {
+                            alertMessage = "Error parsing command"
+                            showAlert.toggle()
+                            return
+                        }
+                        let paramHex = hexToBytes(paramHexString) ?? []
+                        if (paramHex.isEmpty) {
+                            alertMessage = "Error parsing params"
+                            showAlert.toggle()
+                            return
+                        }
+                        let cmd = Commands.buildCommand(cmd: cmdHex, data: paramHex)
                         hexString = ER302Driver.byteArrayToHexString(cmd)
                     }
                 }
@@ -425,7 +437,6 @@ struct ContentView: View {
                         TextField("phone", text: .constant(""))
                             .disabled(true)
                         Button("Upload") {
-                            uploadVCardClassic()
                         }
                         .disabled(true)
                         Button("Download") {
@@ -461,6 +472,11 @@ struct ContentView: View {
         nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
         sendCommonULCommands()
         let dataToWrite = Commands.createNdefUrlMessage(url: url)
+        if (dataToWrite == nil) {
+            alertMessage = "Invalid URL!"
+            showAlert.toggle()
+            return
+        }
         for i in stride(from: 0, to: dataToWrite!.count, by: 4) {
             // Kiszámoljuk a hátralévő bájtokat a chunk méretéhez
             let remaining = dataToWrite!.count - i
@@ -545,6 +561,12 @@ struct ContentView: View {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
         }
+        let kclassic = hexToBytes(keyForClassic) ?? []
+        if (kclassic.isEmpty  || kclassic.count != 6) {
+            alertMessage = "Error parsing actual key. Please enter a valid key."
+            showAlert.toggle()
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.VCARD_CLASSIC_MESSAGE
         nfcManager.rawData = Data()
@@ -596,6 +618,14 @@ struct ContentView: View {
         if selectedPersonIndex == nil || nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
         }
+        
+        let kclassic = hexToBytes(keyForClassic) ?? []
+        if (kclassic.isEmpty  || kclassic.count != 6) {
+            alertMessage = "Error parsing actual key. Please enter a valid key."
+            showAlert.toggle()
+            return
+        }
+
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.WRITE_VCARD_CLASSIC_MESSAGE
         
@@ -675,6 +705,12 @@ struct ContentView: View {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
         }
+        let kcurrent = hexToBytes(currentKey) ?? []
+        if (kcurrent.isEmpty  || kcurrent.count != 6) {
+            alertMessage = "Error parsing current key. Please enter a valid key."
+            showAlert.toggle()
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.GET_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
@@ -687,6 +723,12 @@ struct ContentView: View {
     
     func setBalance() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
+        let kcurrent = hexToBytes(currentKey) ?? []
+        if (kcurrent.isEmpty  || kcurrent.count != 6) {
+            alertMessage = "Error parsing current key. Please enter a valid key."
+            showAlert.toggle()
             return
         }
         nfcManager.clearLog()
@@ -704,6 +746,12 @@ struct ContentView: View {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
         }
+        let kcurrent = hexToBytes(currentKey) ?? []
+        if (kcurrent.isEmpty  || kcurrent.count != 6) {
+            alertMessage = "Error parsing current key. Please enter a valid key."
+            showAlert.toggle()
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.INC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
@@ -719,6 +767,12 @@ struct ContentView: View {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
             return
         }
+        let kcurrent = hexToBytes(currentKey) ?? []
+        if (kcurrent.isEmpty  || kcurrent.count != 6) {
+            alertMessage = "Error parsing current key. Please enter a valid key."
+            showAlert.toggle()
+            return
+        }
         nfcManager.clearLog()
         nfcManager.commandsProcessor = SerialManager.PROCESS.DEC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
@@ -732,6 +786,24 @@ struct ContentView: View {
 
     func saveNewPassKey() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
+        let kcurrent = hexToBytes(currentKeyForChange) ?? []
+        if (kcurrent.isEmpty  || kcurrent.count != 6) {
+            alertMessage = "Error parsing current key. Please enter a valid key."
+            showAlert.toggle()
+            return
+        }
+        let knew = hexToBytes(newKeyForChange) ?? []
+        if (knew.isEmpty  || knew.count != 6) {
+            alertMessage = "Error parsing new key. Please enter a valid key."
+            showAlert.toggle()
+            return
+        }
+        let acc = hexToBytes(keyAccessBitsForChange) ?? []
+        if (acc.isEmpty  || acc.count != 4) {
+            alertMessage = "Error parsing access bits. Please enter a valid access bits."
+            showAlert.toggle()
             return
         }
         nfcManager.clearLog()
@@ -750,6 +822,12 @@ struct ContentView: View {
     
     func getAccessBits() {
         if nfcManager.serialPort == nil || nfcManager.serialPort?.isOpen == false {
+            return
+        }
+        let kcurrent = hexToBytes(currentKeyForChange) ?? []
+        if (kcurrent.isEmpty  || kcurrent.count != 6) {
+            alertMessage = "Error parsing current key. Please enter a valid key."
+            showAlert.toggle()
             return
         }
         nfcManager.clearLog()

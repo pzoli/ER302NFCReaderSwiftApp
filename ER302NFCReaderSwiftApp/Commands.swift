@@ -277,7 +277,7 @@ class Commands {
     
     static func decodeNdefText(raw: [UInt8]) -> String {
         guard let typeIndex = raw.firstIndex(of: 0x54) else {
-            return "Nem Text Record."
+            return "Not a Text Record."
         }
         
         let payloadStartIndex = typeIndex + 1
@@ -290,7 +290,7 @@ class Commands {
         guard textStartIndex < raw.count else { return "" }
         
         let textBytes = raw[textStartIndex...]
-        return String(bytes: textBytes, encoding: .utf8) ?? "Hiba a dekódolás során"
+        return String(bytes: textBytes, encoding: .utf8) ?? "Error on decoding."
     }
 
     
