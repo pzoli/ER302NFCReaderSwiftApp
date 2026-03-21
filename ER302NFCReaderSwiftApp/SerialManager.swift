@@ -32,13 +32,13 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     public var balance: UInt32 = 0
     public var modification: UInt32 = 0
     public var accessBits = ""
-    public var commandsProcessor: PROCESS = PROCESS.SINGLE_MESSAGE
-
-    public enum PROCESS {
-        case SINGLE_MESSAGE, URL_MESSAGE, TEXT_MESSAGE, VCARD_MESSAGE, VCARD_CLASSIC_MESSAGE,
-        SET_BALANCE_MESSAGE, GET_BALANCE_MESSAGE, INC_BALANCE_MESSAGE, DEC_BALANCE_MESSAGE,
-        SETKEY_MESSAGE, GET_ACCESSBITS_MESSAGE, WRITE_VCARD_CLASSIC_MESSAGE
-    };
+    public var messageProcessor: ((ER302Driver.ReceivedStruct) -> Void)?
+    
+    public var subprocess: SUBPROCESS? = nil
+    
+    enum SUBPROCESS {
+        case SET_BALANCE_MESSAGE, GET_BALANCE_MESSAGE, INC_BALANCE_MESSAGE, DEC_BALANCE_MESSAGE
+    }
     
     func setupPort(path: String) {
         // Az ER302 alapértelmezett baud rate-je általában 115200 vagy 9600
@@ -93,25 +93,8 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         var result = ER302Driver.decodeReceivedData(Array(currentBuffer))
         
         while result.length > 0 {
-            switch commandsProcessor { //Better way is a method pointer instead switch
-            case .URL_MESSAGE:
-                readUrlProcessCommands(result)
-            case .TEXT_MESSAGE:
-                readTextProcessCommands(result)
-            case .VCARD_MESSAGE:
-                readVCardProcessCommands(result)
-            case .VCARD_CLASSIC_MESSAGE:
-                readVCardClassicProcessCommands(result)
-            case .SET_BALANCE_MESSAGE, .GET_BALANCE_MESSAGE, .INC_BALANCE_MESSAGE, .DEC_BALANCE_MESSAGE:
-                processBalanceCommads(result)
-            case .SETKEY_MESSAGE:
-                processPasswordKeyChange(result)
-            case .GET_ACCESSBITS_MESSAGE:
-                processGetAccessBits(result)
-            case .WRITE_VCARD_CLASSIC_MESSAGE:
-                processVCardWriteClassic(result)
-            default:
-                break
+            if messageProcessor != nil {
+                messageProcessor!(result)
             }
             
             if result.length < currentBuffer.count {
@@ -161,7 +144,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
     
     // MARK: - Command Processing Stubs
 
-    private func readUrlProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func readUrlProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
         appendLog("readUrlProcessCommands called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_READ_FW_VERSION:
@@ -198,7 +181,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         }
     }
 
-    private func readTextProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func readTextProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_READ_FW_VERSION:
             if let dataString = String(bytes: res.data, encoding: .utf8) {
@@ -234,7 +217,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         }
     }
 
-    private func readVCardProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func readVCardProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
         appendLog("readVCardProcessCommands called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_READ_FW_VERSION:
@@ -272,7 +255,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         }
     }
 
-    private func processBalanceCommads(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func processBalanceCommads(_ decodedResult: ER302Driver.ReceivedStruct) {
         appendLog("processBalanceCommads called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_REQUEST:
@@ -299,8 +282,8 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
             )
             addCommand(cmd: command)
         case let res where res.cmd == ER302Driver.CMD_MIFARE_AUTH2:
-            switch commandsProcessor {
-            case PROCESS.GET_BALANCE_MESSAGE:
+            switch subprocess! {
+            case SUBPROCESS.GET_BALANCE_MESSAGE:
                 let command = ER302Driver.CommandStruct(
                     id: 7,
                     description: "MiFare get balance",
@@ -328,8 +311,6 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
                     cmd: Commands.decBalance(sector: currentSector, block: currentBlock, i: modification)
                 )
                 addCommand(cmd: command)
-            default:
-                break
             }
         case let res where res.cmd == ER302Driver.CMD_MIFARE_READ_BALANCE:
             if (res.error == 0x00) {
@@ -348,7 +329,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         }
     }
 
-    private func processPasswordKeyChange(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func processPasswordKeyChange(_ decodedResult: ER302Driver.ReceivedStruct) {
         appendLog("processPasswordKeyChange called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
@@ -399,7 +380,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         }
     }
 
-    private func processGetAccessBits(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func processGetAccessBits(_ decodedResult: ER302Driver.ReceivedStruct) {
         appendLog("processGetAccessBits called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
@@ -442,7 +423,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         pushCommand(cmd: command)
     }
 
-    private func readVCardClassicProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func readVCardClassicProcessCommands(_ decodedResult: ER302Driver.ReceivedStruct) {
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:
             appendLog("MiFare anticollision received UID: " + Data(res.data).hexEncodedString())
@@ -488,7 +469,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         }
     }
     
-    private func processVCardWriteClassic(_ decodedResult: ER302Driver.ReceivedStruct) {
+    public func processVCardWriteClassic(_ decodedResult: ER302Driver.ReceivedStruct) {
         appendLog("processVCardWriteClassic called with length: \(decodedResult.length)")
         switch decodedResult {
         case let res where res.cmd == ER302Driver.CMD_MIFARE_ANTICOLISION:

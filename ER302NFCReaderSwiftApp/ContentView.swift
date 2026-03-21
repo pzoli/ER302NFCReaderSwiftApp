@@ -453,7 +453,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.URL_MESSAGE
+        nfcManager.messageProcessor = nfcManager.readUrlProcessCommands
         nfcManager.rawData = Data()
         nfcManager.ulReadPageIdx = 4
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "Firmware version", cmd: Commands.readFirmware()));
@@ -469,7 +469,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
+        nfcManager.messageProcessor = nil
         sendCommonULCommands()
         let dataToWrite = Commands.createNdefUrlMessage(url: url)
         if (dataToWrite == nil) {
@@ -502,7 +502,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.TEXT_MESSAGE
+        nfcManager.messageProcessor = nfcManager.readTextProcessCommands
         nfcManager.rawData = Data()
         nfcManager.ulReadPageIdx = 4
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "Firmware version", cmd: Commands.readFirmware()));
@@ -518,7 +518,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
+        nfcManager.messageProcessor = nil
         sendCommonULCommands()
         let dataToWrite = Commands.createNdefTextMessage(text: text)
         for i in stride(from: 0, to: dataToWrite.count, by: 4) {
@@ -546,7 +546,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.VCARD_MESSAGE
+        nfcManager.messageProcessor = nfcManager.readVCardProcessCommands
         nfcManager.rawData = Data()
         nfcManager.ulReadPageIdx = 4
         nfcManager.addCommand(cmd: ER302Driver.CommandStruct(id:1, description: "Firmware version", cmd: Commands.readFirmware()));
@@ -568,7 +568,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.VCARD_CLASSIC_MESSAGE
+        nfcManager.messageProcessor = nfcManager.readVCardClassicProcessCommands
         nfcManager.rawData = Data()
         nfcManager.currentSector = 1
         nfcManager.currentBlock = 0
@@ -586,7 +586,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.SINGLE_MESSAGE
+        nfcManager.messageProcessor = nil
         
         sendCommonULCommands()
         let dataToWrite = Commands.createNdefVCardMessage(name: vcardName, phone: vcardPhone, email: vcardEmail)
@@ -627,8 +627,7 @@ struct ContentView: View {
         }
         
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.WRITE_VCARD_CLASSIC_MESSAGE
-        
+        nfcManager.messageProcessor = nfcManager.processVCardWriteClassic
         // Build NDEF vCard payload using existing helper
         let index = selectedPersonIndex!
         let ndef = Commands.createNdefVCardMessage(name: people[index].name, phone: people[index].phone, email: people[index].email)
@@ -723,7 +722,8 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.GET_BALANCE_MESSAGE
+        nfcManager.messageProcessor = nfcManager.processBalanceCommads
+        nfcManager.subprocess = SerialManager.SUBPROCESS.GET_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
         nfcManager.currentSector = currentSector
@@ -743,7 +743,8 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.SET_BALANCE_MESSAGE
+        nfcManager.messageProcessor = nfcManager.processBalanceCommads
+        nfcManager.subprocess = SerialManager.SUBPROCESS.SET_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
         nfcManager.currentSector = currentSector
@@ -764,7 +765,8 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.INC_BALANCE_MESSAGE
+        nfcManager.messageProcessor = nfcManager.processBalanceCommads
+        nfcManager.subprocess = SerialManager.SUBPROCESS.INC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
         nfcManager.currentSector = currentSector
@@ -785,7 +787,8 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.DEC_BALANCE_MESSAGE
+        nfcManager.messageProcessor = nfcManager.processBalanceCommads
+        nfcManager.subprocess = SerialManager.SUBPROCESS.DEC_BALANCE_MESSAGE
         nfcManager.currentKey = currentKey
         nfcManager.isCurrentKeyA = currentKeyType == "KeyA"
         nfcManager.currentSector = currentSector
@@ -818,7 +821,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.SETKEY_MESSAGE
+        nfcManager.messageProcessor = nfcManager.processPasswordKeyChange
         nfcManager.currentKey = currentKeyForChange
         nfcManager.newKey = newKeyForChange
         nfcManager.accessBits = keyAccessBitsForChange
@@ -842,7 +845,7 @@ struct ContentView: View {
             return
         }
         nfcManager.clearLog()
-        nfcManager.commandsProcessor = SerialManager.PROCESS.GET_ACCESSBITS_MESSAGE
+        nfcManager.messageProcessor = nfcManager.processGetAccessBits
         nfcManager.currentKey = currentKeyForChange
         nfcManager.isCurrentKeyA = keyTypeForChange == "KeyA"
         nfcManager.currentSector = currentSectorForChange
