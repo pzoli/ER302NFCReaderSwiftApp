@@ -93,7 +93,7 @@ class SerialManager: NSObject, ORSSerialPortDelegate, ObservableObject {
         var result = ER302Driver.decodeReceivedData(Array(currentBuffer))
         
         while result.length > 0 {
-            switch commandsProcessor {
+            switch commandsProcessor { //Better way is a method pointer instead switch
             case .URL_MESSAGE:
                 readUrlProcessCommands(result)
             case .TEXT_MESSAGE:
